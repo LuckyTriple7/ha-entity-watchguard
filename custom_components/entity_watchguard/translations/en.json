@@ -1,0 +1,107 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Entity Watchguard",
+        "description": "Choose the domains to watch for unavailable entities. Everything else (timings, recovery, exceptions, notifications) can be adjusted later via the options.",
+        "data": {
+          "monitored_domains": "Monitored domains"
+        }
+      }
+    },
+    "error": {
+      "no_domains": "Please select at least one domain."
+    },
+    "abort": {
+      "single_instance_allowed": "Entity Watchguard is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Entity Watchguard options",
+        "menu_options": {
+          "domains": "Monitored domains",
+          "timing": "Timings",
+          "recovery": "Recovery",
+          "exceptions": "Exceptions",
+          "notifications": "Notifications"
+        }
+      },
+      "domains": {
+        "title": "Monitored domains",
+        "data": {
+          "monitored_domains": "Monitored domains"
+        }
+      },
+      "timing": {
+        "title": "Timings",
+        "description": "The startup delay starts counting once Home Assistant has finished starting — entities often need a few minutes to become available.",
+        "data": {
+          "startup_delay": "Startup delay after a restart",
+          "check_interval": "Check interval",
+          "grace_period": "Grace period before an entity is reported"
+        }
+      },
+      "recovery": {
+        "title": "Recovery",
+        "description": "Stage 1 asks Home Assistant to poll the entity again. Stage 2 reloads the config entry the entity belongs to — more effective, but all entities of that integration disappear briefly.",
+        "data": {
+          "recover_stage1_enabled": "Stage 1: update entity",
+          "recover_stage1_delay": "Stage 1 after",
+          "recover_stage2_enabled": "Stage 2: reload config entry",
+          "recover_stage2_delay": "Stage 2 after",
+          "reload_cooldown": "Minimum time between reloads of the same config entry",
+          "max_reloads_per_cycle": "Maximum reloads per check"
+        }
+      },
+      "exceptions": {
+        "title": "Exceptions",
+        "description": "Excluded entities are never reported and never recovered. Patterns are regular expressions matched against the entity ID, e.g. .*_internet_access$",
+        "data": {
+          "exclude_labels": "Excluded labels",
+          "exclude_entities": "Excluded entities",
+          "exclude_devices": "Excluded devices",
+          "exclude_areas": "Excluded areas",
+          "exclude_patterns": "Excluded patterns (regex)"
+        }
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "One persistent notification per domain; it updates itself and is dismissed automatically once the domain is clean again.",
+        "data": {
+          "notify_enabled": "Enable persistent notifications",
+          "notify_delay": "Notify after"
+        }
+      }
+    },
+    "error": {
+      "no_domains": "Please select at least one domain.",
+      "invalid_pattern": "At least one pattern is not a valid regular expression."
+    }
+  },
+  "services": {
+    "recover_now": {
+      "name": "Recover now",
+      "description": "Immediately attempts to recover the currently unavailable entities, ignoring the configured delays.",
+      "fields": {
+        "domain": {
+          "name": "Domain",
+          "description": "Limit the attempt to a single domain, e.g. light."
+        },
+        "entity_id": {
+          "name": "Entities",
+          "description": "Limit the attempt to these entities."
+        },
+        "escalate": {
+          "name": "Escalate",
+          "description": "Also run stage 2 (reload the config entry)."
+        }
+      }
+    },
+    "clear_notifications": {
+      "name": "Clear notifications",
+      "description": "Dismisses all persistent notifications created by Entity Watchguard."
+    }
+  }
+}

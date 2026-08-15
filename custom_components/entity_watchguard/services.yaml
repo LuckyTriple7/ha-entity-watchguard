@@ -1,0 +1,19 @@
+recover_now:
+  fields:
+    domain:
+      required: false
+      example: light
+      selector:
+        text:
+    entity_id:
+      required: false
+      selector:
+        entity:
+          multiple: true
+    escalate:
+      required: false
+      default: false
+      selector:
+        boolean:
+
+clear_notifications:

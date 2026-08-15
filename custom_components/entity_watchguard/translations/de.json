@@ -1,0 +1,107 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Entity Watchguard",
+        "description": "Wähle die Domains, die auf nicht verfügbare Entities überwacht werden sollen. Alles Weitere (Zeiten, Wiederherstellung, Ausnahmen, Benachrichtigungen) lässt sich später in den Optionen anpassen.",
+        "data": {
+          "monitored_domains": "Überwachte Domains"
+        }
+      }
+    },
+    "error": {
+      "no_domains": "Bitte mindestens eine Domain auswählen."
+    },
+    "abort": {
+      "single_instance_allowed": "Entity Watchguard ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Entity Watchguard Optionen",
+        "menu_options": {
+          "domains": "Überwachte Domains",
+          "timing": "Zeiten",
+          "recovery": "Wiederherstellung",
+          "exceptions": "Ausnahmen",
+          "notifications": "Benachrichtigungen"
+        }
+      },
+      "domains": {
+        "title": "Überwachte Domains",
+        "data": {
+          "monitored_domains": "Überwachte Domains"
+        }
+      },
+      "timing": {
+        "title": "Zeiten",
+        "description": "Die Startverzögerung läuft ab dem Moment, in dem Home Assistant fertig gestartet ist – Entities brauchen oft noch einige Minuten, bis sie verfügbar sind.",
+        "data": {
+          "startup_delay": "Startverzögerung nach Neustart",
+          "check_interval": "Prüfintervall",
+          "grace_period": "Karenzzeit, bevor eine Entity gemeldet wird"
+        }
+      },
+      "recovery": {
+        "title": "Wiederherstellung",
+        "description": "Stufe 1 fordert Home Assistant auf, die Entity erneut abzufragen. Stufe 2 lädt den Config-Entry der zugehörigen Integration neu – wirksamer, aber alle Entities dieser Integration sind kurz weg.",
+        "data": {
+          "recover_stage1_enabled": "Stufe 1: Entity aktualisieren",
+          "recover_stage1_delay": "Stufe 1 nach",
+          "recover_stage2_enabled": "Stufe 2: Config-Entry neu laden",
+          "recover_stage2_delay": "Stufe 2 nach",
+          "reload_cooldown": "Mindestabstand zwischen zwei Reloads desselben Config-Entry",
+          "max_reloads_per_cycle": "Maximale Reloads pro Prüflauf"
+        }
+      },
+      "exceptions": {
+        "title": "Ausnahmen",
+        "description": "Ausgenommene Entities werden weder gemeldet noch wiederhergestellt. Muster sind reguläre Ausdrücke auf die Entity-ID, z. B. .*_internet_access$",
+        "data": {
+          "exclude_labels": "Ausgenommene Labels",
+          "exclude_entities": "Ausgenommene Entities",
+          "exclude_devices": "Ausgenommene Geräte",
+          "exclude_areas": "Ausgenommene Bereiche",
+          "exclude_patterns": "Ausgenommene Muster (Regex)"
+        }
+      },
+      "notifications": {
+        "title": "Benachrichtigungen",
+        "description": "Eine persistente Benachrichtigung pro Domain; sie aktualisiert sich selbst und verschwindet automatisch, sobald die Domain wieder sauber ist.",
+        "data": {
+          "notify_enabled": "Persistente Benachrichtigungen aktivieren",
+          "notify_delay": "Benachrichtigen nach"
+        }
+      }
+    },
+    "error": {
+      "no_domains": "Bitte mindestens eine Domain auswählen.",
+      "invalid_pattern": "Mindestens ein Muster ist kein gültiger regulärer Ausdruck."
+    }
+  },
+  "services": {
+    "recover_now": {
+      "name": "Jetzt wiederherstellen",
+      "description": "Versucht sofort, die aktuell nicht verfügbaren Entities wiederherzustellen – unabhängig von den eingestellten Wartezeiten.",
+      "fields": {
+        "domain": {
+          "name": "Domain",
+          "description": "Versuch auf eine Domain beschränken, z. B. light."
+        },
+        "entity_id": {
+          "name": "Entities",
+          "description": "Versuch auf diese Entities beschränken."
+        },
+        "escalate": {
+          "name": "Eskalieren",
+          "description": "Zusätzlich Stufe 2 ausführen (Config-Entry neu laden)."
+        }
+      }
+    },
+    "clear_notifications": {
+      "name": "Benachrichtigungen löschen",
+      "description": "Verwirft alle von Entity Watchguard erzeugten persistenten Benachrichtigungen."
+    }
+  }
+}
