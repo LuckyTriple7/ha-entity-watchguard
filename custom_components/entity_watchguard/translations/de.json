@@ -52,7 +52,9 @@
           "recover_stage2_enabled": "Stufe 2: Config-Entry neu laden",
           "recover_stage2_delay": "Stufe 2 nach",
           "reload_cooldown": "Mindestabstand zwischen zwei Reloads desselben Config-Entry",
-          "max_reloads_per_cycle": "Maximale Reloads pro Prüflauf"
+          "max_reloads_per_cycle": "Maximale Reloads pro Prüflauf",
+          "retry_interval": "Stufe 2 wiederholen alle (0 = nur einmal)",
+          "max_recovery_attempts": "Aufgeben nach so vielen Stufe-2-Versuchen (0 = nie aufgeben)"
         }
       },
       "exceptions": {
@@ -68,16 +70,24 @@
       },
       "notifications": {
         "title": "Benachrichtigungen",
-        "description": "Eine persistente Benachrichtigung pro Domain; sie aktualisiert sich selbst und verschwindet automatisch, sobald die Domain wieder sauber ist.",
+        "description": "Eine persistente Benachrichtigung pro Domain; sie aktualisiert sich selbst und verschwindet automatisch, sobald die Domain wieder sauber ist. Reparatur-Hinweise erscheinen unter Einstellungen → Reparaturen und lassen sich pro Domain ignorieren. Ein Notify-Dienst (z. B. notify.mobile_app_handy) wird nur beim Wechsel des Zustands gerufen, nicht bei jedem Prüflauf.",
         "data": {
           "notify_enabled": "Persistente Benachrichtigungen aktivieren",
-          "notify_delay": "Benachrichtigen nach"
+          "repairs_enabled": "Reparatur-Hinweise aktivieren",
+          "notify_delay": "Benachrichtigen nach",
+          "notify_service": "Notify-Dienst (optional)"
         }
       }
     },
     "error": {
       "no_domains": "Bitte mindestens eine Domain auswählen.",
       "invalid_pattern": "Mindestens ein Muster ist kein gültiger regulärer Ausdruck."
+    }
+  },
+  "issues": {
+    "unavailable_entities": {
+      "title": "{count} nicht verfügbare {domain}-Entities",
+      "description": "Entity Watchguard meldet diese {domain}-Entities als nicht verfügbar, und die Wiederherstellungsversuche haben sie nicht zurückgeholt:\n\n{entities}\n\nDer Hinweis verschwindet von selbst, sobald sie wieder verfügbar sind. Für bewusst abgeschaltete Geräte ignorieren – oder sie über ein Label unter Konfigurieren → Ausnahmen dauerhaft ausklammern."
     }
   },
   "services": {

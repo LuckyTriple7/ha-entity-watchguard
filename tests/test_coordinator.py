@@ -13,10 +13,12 @@ from custom_components.entity_watchguard.filters import build_exclusion
 
 from custom_components.entity_watchguard.const import (
     CONF_GRACE_PERIOD,
+    CONF_MAX_RECOVERY_ATTEMPTS,
     CONF_MAX_RELOADS_PER_CYCLE,
     CONF_NOTIFY_DELAY,
     CONF_NOTIFY_ENABLED,
     CONF_RELOAD_COOLDOWN,
+    CONF_RETRY_INTERVAL,
     CONF_STAGE1_DELAY,
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
@@ -242,6 +244,58 @@ async def test_failed_reload_is_logged_as_error(hass, setup_watchguard, caplog):
 
     assert "reloading config entry" in caplog.text
     assert "boom" in caplog.text
+
+
+async def test_stage2_retries_then_gives_up(hass, setup_watchguard):
+    other = MockConfigEntry(domain="demo")
+    other.add_to_hass(hass)
+    other.mock_state(hass, ConfigEntryState.LOADED)
+    _register_entity(hass, other, "light", "kitchen")
+
+    _, coordinator = await setup_watchguard(
+        **{
+            CONF_STAGE2_ENABLED: True,
+            CONF_STAGE2_DELAY: 900,
+            CONF_RETRY_INTERVAL: 3600,
+            CONF_RELOAD_COOLDOWN: 0,
+            CONF_MAX_RECOVERY_ATTEMPTS: 2,
+        }
+    )
+
+    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as reload:
+        for _ in range(4):
+            backdate(coordinator, 4000)
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+    assert reload.await_count == 2  # capped by max_recovery_attempts
+    tracked = coordinator.tracked["light.kitchen"]
+    assert tracked.given_up is True
+    assert coordinator.data["domains"]["light"].given_up == ["light.kitchen"]
+
+
+async def test_stage2_runs_once_when_retry_disabled(hass, setup_watchguard):
+    other = MockConfigEntry(domain="demo")
+    other.add_to_hass(hass)
+    other.mock_state(hass, ConfigEntryState.LOADED)
+    _register_entity(hass, other, "light", "kitchen")
+
+    _, coordinator = await setup_watchguard(
+        **{
+            CONF_STAGE2_ENABLED: True,
+            CONF_STAGE2_DELAY: 900,
+            CONF_RETRY_INTERVAL: 0,
+            CONF_RELOAD_COOLDOWN: 0,
+        }
+    )
+
+    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as reload:
+        for _ in range(3):
+            backdate(coordinator, 4000)
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+    assert reload.await_count == 1
 
 
 async def test_exclusion_is_cached_until_a_registry_changes(hass, setup_watchguard):

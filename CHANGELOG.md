@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-08-15
+### Added
+- Stage 2 can now repeat (default: every 60 min) instead of running once per outage, and gives up after a configurable number of attempts (default 3, `0` = never). Given-up entities stay reported and appear in the new `given_up_entities` attribute — they just stop triggering reloads
+- **Repair issues** as an optional second output (on by default, switchable under Configure → Notifications). They show up under Settings → Repairs and can be ignored per domain, which persistent notifications can't
+- Optional **notify service** (e.g. `notify.mobile_app_phone`), called only when a domain starts or stops having a problem — not on every check
+- Notification lines group entities by device: one dead Shelly is one line, not twelve
+
+### Changed
+- `entity_watchguard.clear_notifications` now clears repair issues too
+
 ## [0.3.0] - 2026-08-15
 ### Changed
 - **Breaking-ish:** the labels `offline` and `temp_offline` are no longer pre-filled as default exceptions. Label names are per-instance — guessing them silently hid entities in setups that use those labels for something else. If you relied on them, set them once under Configure → Exceptions

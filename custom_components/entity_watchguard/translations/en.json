@@ -52,7 +52,9 @@
           "recover_stage2_enabled": "Stage 2: reload config entry",
           "recover_stage2_delay": "Stage 2 after",
           "reload_cooldown": "Minimum time between reloads of the same config entry",
-          "max_reloads_per_cycle": "Maximum reloads per check"
+          "max_reloads_per_cycle": "Maximum reloads per check",
+          "retry_interval": "Repeat stage 2 every (0 = only once)",
+          "max_recovery_attempts": "Give up after this many stage 2 attempts (0 = never give up)"
         }
       },
       "exceptions": {
@@ -68,16 +70,24 @@
       },
       "notifications": {
         "title": "Notifications",
-        "description": "One persistent notification per domain; it updates itself and is dismissed automatically once the domain is clean again.",
+        "description": "One persistent notification per domain; it updates itself and is dismissed automatically once the domain is clean again. Repair issues show up under Settings → Repairs and can be ignored per domain. A notify service (e.g. notify.mobile_app_phone) is only called when a domain starts or stops having a problem, not on every check.",
         "data": {
           "notify_enabled": "Enable persistent notifications",
-          "notify_delay": "Notify after"
+          "repairs_enabled": "Enable repair issues",
+          "notify_delay": "Notify after",
+          "notify_service": "Notify service (optional)"
         }
       }
     },
     "error": {
       "no_domains": "Please select at least one domain.",
       "invalid_pattern": "At least one pattern is not a valid regular expression."
+    }
+  },
+  "issues": {
+    "unavailable_entities": {
+      "title": "{count} unavailable {domain} entities",
+      "description": "Entity Watchguard has been reporting these {domain} entities as unavailable, and recovery attempts did not bring them back:\n\n{entities}\n\nThis issue disappears on its own once they are available again. Ignore it for devices you knowingly powered down — or exclude them permanently via a label under Configure → Exceptions."
     }
   },
   "services": {

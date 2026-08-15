@@ -53,7 +53,9 @@ class WatchguardDomainProblem(WatchguardEntity, BinarySensorEntity):
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     # Long lists that change on every outage — keep them out of the recorder.
-    _unrecorded_attributes = frozenset({"unavailable_entities", "unavailable_names"})
+    _unrecorded_attributes = frozenset(
+        {"unavailable_entities", "unavailable_names", "given_up_entities"}
+    )
 
     def __init__(
         self, coordinator: WatchguardCoordinator, entry: ConfigEntry, domain: str
@@ -86,6 +88,7 @@ class WatchguardDomainProblem(WatchguardEntity, BinarySensorEntity):
             "unavailable_names": _capped(report.names),
             "unavailable_since": dt_util.as_local(report.since).isoformat() if report.since else None,
             "recovery_attempts": report.attempts,
+            "given_up_entities": _capped(report.given_up),
             "truncated": report.count > MAX_LISTED,
         }
 

@@ -11,6 +11,7 @@ from custom_components.entity_watchguard.const import (
     CONF_GRACE_PERIOD,
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_ENABLED,
+    CONF_REPAIRS_ENABLED,
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_ENABLED,
     CONF_STARTUP_DELAY,
@@ -27,6 +28,7 @@ BASE_OPTIONS = {
     CONF_STAGE1_ENABLED: False,
     CONF_STAGE2_ENABLED: False,
     CONF_NOTIFY_ENABLED: False,
+    CONF_REPAIRS_ENABLED: False,
 }
 
 
@@ -66,6 +68,15 @@ def setup_watchguard(hass, make_entry):
 
 
 def backdate(coordinator: WatchguardCoordinator, seconds: int) -> None:
-    """Pretend every tracked entity went unavailable `seconds` ago."""
+    """Pretend `seconds` have passed for every tracked entity.
+
+    Shifts the recovery timestamps too, so retry intervals become due the same
+    way they would with real time passing.
+    """
+    delta = timedelta(seconds=seconds)
     for tracked in coordinator.tracked.values():
-        tracked.first_unavailable -= timedelta(seconds=seconds)
+        tracked.first_unavailable -= delta
+        if tracked.stage1_at is not None:
+            tracked.stage1_at -= delta
+        if tracked.stage2_at is not None:
+            tracked.stage2_at -= delta

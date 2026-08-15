@@ -36,11 +36,15 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 | Recovery | Stage 2 (reload config entry) | off, after 900 s | More effective, but all entities of that integration disappear briefly |
 | Recovery | Reload cooldown | 3600 s | Minimum distance between two reloads of the same config entry |
 | Recovery | Max reloads per check | 3 | Guards against a reload storm |
+| Recovery | Repeat stage 2 every | 3600 s | `0` = try stage 2 only once per outage |
+| Recovery | Give up after | 3 attempts | `0` = never give up. A device that is simply switched off is not worth reloading forever; it stays reported, just without further attempts |
 | Exceptions | Labels | – | Set on an entity, device or area; e.g. an `offline` label for devices you knowingly powered down |
 | Exceptions | Entities / Devices / Areas | – | Explicit pickers |
 | Exceptions | Patterns | – | Regex against the entity ID, e.g. `.*_internet_access$` |
-| Notifications | Enabled | on | One persistent notification per domain |
+| Notifications | Persistent notifications | on | One per domain, self-updating, auto-dismissed. Entities of the same device are collapsed into one line |
+| Notifications | Repair issues | on | Mirrors the same outages into Settings → Repairs, where they can be ignored per domain |
 | Notifications | Notify after | 900 s | Meant to fire *after* the recovery attempts have failed |
+| Notifications | Notify service | – | Optional, e.g. `notify.mobile_app_phone`. Called only when a domain starts or stops having a problem, never on every check |
 
 Only one instance is supported — it watches the whole Home Assistant instance.
 
@@ -48,7 +52,7 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 
 | Entity | Type | Description |
 |---|---|---|
-| `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `status`, `truncated` |
+| `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `given_up_entities`, `status`, `truncated` |
 | `binary_sensor.entity_watchguard_problem` | problem | ON when any watched domain has a problem. Attributes: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | count | Total across all watched domains, `per_domain` breakdown in the attributes |
 | `sensor.entity_watchguard_last_recovery_attempt` | timestamp | Diagnostic |

@@ -12,6 +12,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import label_registry as lr
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -20,11 +21,15 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CONF_CHECK_INTERVAL,
     CONF_GRACE_PERIOD,
+    CONF_MAX_RECOVERY_ATTEMPTS,
     CONF_MAX_RELOADS_PER_CYCLE,
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_DELAY,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_SERVICE,
     CONF_RELOAD_COOLDOWN,
+    CONF_REPAIRS_ENABLED,
+    CONF_RETRY_INTERVAL,
     CONF_STAGE1_DELAY,
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
@@ -65,6 +70,46 @@ class Tracked:
     stage1_at: datetime | None = None
     stage2_at: datetime | None = None
     attempts: int = 0
+    # Stage 2 rounds so far; once it hits max_recovery_attempts we stop trying
+    # (given_up) instead of reloading someone's integration forever.
+    stage2_rounds: int = 0
+    given_up: bool = False
+
+
+@dataclass(slots=True)
+class Outage:
+    """What gets reported for one domain (notification / repair / push)."""
+
+    entity_ids: list[str] = field(default_factory=list)
+    lines: list[str] = field(default_factory=list)
+    given_up: int = 0
+
+
+def _since(tracked: Tracked, use_de: bool) -> str:
+    stamp = dt_util.as_local(tracked.first_unavailable).strftime("%d.%m.%Y %H:%M")
+    return f"{'seit' if use_de else 'since'} {stamp}"
+
+
+def _given_up_mark(use_de: bool) -> str:
+    return " [aufgegeben]" if use_de else " [gave up]"
+
+
+def _entity_line(entity_id: str, tracked: Tracked, use_de: bool) -> str:
+    mark = _given_up_mark(use_de) if tracked.given_up else ""
+    return f"• {tracked.name} ({entity_id}) – {_since(tracked, use_de)}{mark}"
+
+
+def _device_line(
+    device_name: str | None, members: list[tuple[str, "Tracked"]], use_de: bool
+) -> str:
+    _, first = members[0]
+    mark = _given_up_mark(use_de) if all(tracked.given_up for _, tracked in members) else ""
+    name = device_name or ("Unbekanntes Gerät" if use_de else "Unknown device")
+    label = "Entities" if use_de else "entities"
+    listed = ", ".join(entity_id for entity_id, _ in members[:5])
+    if len(members) > 5:
+        listed += ", …"
+    return f"• {name}: {len(members)} {label} ({listed}) – {_since(first, use_de)}{mark}"
 
 
 @dataclass(slots=True)
@@ -73,6 +118,7 @@ class DomainReport:
 
     entity_ids: list[str] = field(default_factory=list)
     names: list[str] = field(default_factory=list)
+    given_up: list[str] = field(default_factory=list)
     since: datetime | None = None
     attempts: int = 0
 
@@ -97,6 +143,8 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._tracked: dict[str, Tracked] = {}
         self._reloaded_at: dict[str, datetime] = {}
         self._notifications: dict[str, str] = {}
+        self._issues: set[str] = set()
+        self._pushed: set[str] = set()
         # None until HA has finished starting; see async_setup_activation().
         self._active_at: datetime | None = None
         # Resolving labels/devices/areas walks the whole entity registry, which
@@ -174,7 +222,7 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
 
         self._async_scan(now)
         await self._async_recover(now)
-        self._async_update_notifications(now)
+        await self._async_report(now)
         return self._build_data(now)
 
     def _async_scan(self, now: datetime) -> None:
@@ -218,6 +266,8 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             report.entity_ids.append(entity_id)
             report.names.append(tracked.name)
             report.attempts += tracked.attempts
+            if tracked.given_up:
+                report.given_up.append(entity_id)
             if report.since is None or tracked.first_unavailable < report.since:
                 report.since = tracked.first_unavailable
 
@@ -235,17 +285,27 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             due = [
                 entity_id
                 for entity_id, tracked in self._tracked.items()
-                if tracked.stage1_at is None and now - tracked.first_unavailable >= delay
+                if not tracked.given_up
+                and tracked.stage1_at is None
+                and now - tracked.first_unavailable >= delay
             ]
             if due:
                 await self.async_stage1(due, now)
 
         if self.options[CONF_STAGE2_ENABLED]:
             delay = timedelta(seconds=self.options[CONF_STAGE2_DELAY])
+            retry = timedelta(seconds=self.options[CONF_RETRY_INTERVAL])
             due = [
                 entity_id
                 for entity_id, tracked in self._tracked.items()
-                if tracked.stage2_at is None and now - tracked.first_unavailable >= delay
+                if not tracked.given_up
+                and now - tracked.first_unavailable >= delay
+                and (
+                    tracked.stage2_at is None
+                    # A device that is simply switched off never comes back from
+                    # a single reload — retry, but on a slow interval.
+                    or (retry and now - tracked.stage2_at >= retry)
+                )
             ]
             if due:
                 await self.async_stage2(due, now)
@@ -319,11 +379,25 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                 if (tracked := self._tracked.get(entity_id)) is not None:
                     tracked.stage2_at = now
                     tracked.attempts += 1
+                    tracked.stage2_rounds += 1
+                    self._async_check_give_up(entity_id, tracked)
             self.entry.async_create_background_task(
                 self.hass,
                 self._async_reload(config_entry_id, target.title),
                 f"{DOMAIN}_reload_{config_entry_id}",
             )
+
+    def _async_check_give_up(self, entity_id: str, tracked: Tracked) -> None:
+        """Stop trying after the configured number of stage 2 rounds."""
+        limit = self.options[CONF_MAX_RECOVERY_ATTEMPTS]
+        if not limit or tracked.stage2_rounds < limit:
+            return
+        tracked.given_up = True
+        _LOGGER.warning(
+            "Giving up on %s after %d recovery attempt(s) — it stays reported until it returns",
+            entity_id,
+            tracked.stage2_rounds,
+        )
 
     async def _async_reload(self, config_entry_id: str, title: str) -> None:
         """Reload wrapper — a failing reload must surface as our error, not as
@@ -359,33 +433,65 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             await self.async_stage2(selected, now)
         await self.async_request_refresh()
 
-    # --- notifications --------------------------------------------------
-    def _async_update_notifications(self, now: datetime) -> None:
-        if not self.options[CONF_NOTIFY_ENABLED]:
-            self.async_clear_notifications()
-            return
+    # --- reporting: notifications, repairs, push -------------------------
+    async def _async_report(self, now: datetime) -> None:
+        outages = self._async_outages(now)
+        self._async_update_notifications(outages)
+        self._async_update_repairs(outages)
+        await self._async_push(outages)
 
+    def _async_outages(self, now: datetime) -> dict[str, Outage]:
+        """Entities past the notify delay, grouped per domain and per device."""
         delay = timedelta(seconds=self.options[CONF_NOTIFY_DELAY])
         use_de = self.hass.config.language[:2].lower() == "de"
-        per_domain: dict[str, list[str]] = {}
+        ent_reg = er.async_get(self.hass)
+        dev_reg = dr.async_get(self.hass)
 
+        # domain -> device key ("" = no device) -> entries
+        grouped: dict[str, dict[str, list[tuple[str, Tracked]]]] = {}
         for entity_id, tracked in sorted(self._tracked.items()):
             if now - tracked.first_unavailable < delay:
                 continue
-            since = dt_util.as_local(tracked.first_unavailable).strftime("%d.%m.%Y %H:%M")
-            label = "seit" if use_de else "since"
-            per_domain.setdefault(entity_id.split(".")[0], []).append(
-                f"• {tracked.name} ({entity_id}) – {label} {since}"
-            )
+            registry_entry = ent_reg.async_get(entity_id)
+            device_id = registry_entry.device_id if registry_entry else None
+            grouped.setdefault(entity_id.split(".")[0], {}).setdefault(
+                device_id or "", []
+            ).append((entity_id, tracked))
 
-        for domain, lines in per_domain.items():
+        outages: dict[str, Outage] = {}
+        for domain, by_device in grouped.items():
+            outage = Outage()
+            for device_id, members in by_device.items():
+                outage.entity_ids += [entity_id for entity_id, _ in members]
+                outage.given_up += sum(1 for _, tracked in members if tracked.given_up)
+                device = dev_reg.async_get(device_id) if device_id else None
+                # One line per device beats twelve lines for one dead Shelly.
+                if device is not None and len(members) > 1:
+                    outage.lines.append(
+                        _device_line(device.name_by_user or device.name, members, use_de)
+                    )
+                else:
+                    outage.lines += [
+                        _entity_line(entity_id, tracked, use_de) for entity_id, tracked in members
+                    ]
+            outages[domain] = outage
+        return outages
+
+    def _async_update_notifications(self, outages: dict[str, Outage]) -> None:
+        if not self.options[CONF_NOTIFY_ENABLED]:
+            self._async_clear_notifications()
+            return
+
+        use_de = self.hass.config.language[:2].lower() == "de"
+        for domain, outage in outages.items():
             notification_id = f"{NOTIFICATION_ID_PREFIX}{domain}"
-            if use_de:
-                title = f"Entity Watchguard – {domain} ({len(lines)})"
-                message = f"Nicht verfügbare Entities in `{domain}`:\n" + "\n".join(lines)
-            else:
-                title = f"Entity Watchguard – {domain} ({len(lines)})"
-                message = f"Unavailable entities in `{domain}`:\n" + "\n".join(lines)
+            title = f"Entity Watchguard – {domain} ({len(outage.entity_ids)})"
+            intro = (
+                f"Nicht verfügbare Entities in `{domain}`:"
+                if use_de
+                else f"Unavailable entities in `{domain}`:"
+            )
+            message = intro + "\n" + "\n".join(outage.lines)
             # Re-create only on change: same notification_id replaces in place,
             # but a needless rewrite marks the notification unread again.
             if self._notifications.get(notification_id) == message:
@@ -394,11 +500,98 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             self._notifications[notification_id] = message
 
         for notification_id in list(self._notifications):
-            if notification_id.removeprefix(NOTIFICATION_ID_PREFIX) not in per_domain:
+            if notification_id.removeprefix(NOTIFICATION_ID_PREFIX) not in outages:
                 persistent_notification.async_dismiss(self.hass, notification_id)
                 del self._notifications[notification_id]
 
-    def async_clear_notifications(self) -> None:
+    def _async_update_repairs(self, outages: dict[str, Outage]) -> None:
+        """Mirror the outages into the Repairs dashboard (optional).
+
+        Not fixable from the UI — there is no button we could offer that the
+        Recover now button doesn't already do — but it can be ignored per
+        domain, which persistent notifications can't.
+        """
+        if not self.options[CONF_REPAIRS_ENABLED]:
+            self._async_clear_repairs()
+            return
+
+        for domain, outage in outages.items():
+            issue_id = f"unavailable_{domain}"
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="unavailable_entities",
+                translation_placeholders={
+                    "domain": domain,
+                    "count": str(len(outage.entity_ids)),
+                    "entities": ", ".join(outage.entity_ids[:20]),
+                },
+            )
+            self._issues.add(issue_id)
+
+        for issue_id in list(self._issues):
+            if issue_id.removeprefix("unavailable_") not in outages:
+                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+                self._issues.discard(issue_id)
+
+    async def _async_push(self, outages: dict[str, Outage]) -> None:
+        """Fire the configured notify service on state changes only."""
+        service = (self.options[CONF_NOTIFY_SERVICE] or "").strip()
+        if not service:
+            self._pushed.clear()
+            return
+
+        use_de = self.hass.config.language[:2].lower() == "de"
+        for domain, outage in outages.items():
+            if domain in self._pushed:
+                continue
+            self._pushed.add(domain)
+            count = len(outage.entity_ids)
+            message = (
+                f"{count} Entities in {domain} nicht verfügbar:\n" + "\n".join(outage.lines)
+                if use_de
+                else f"{count} entities in {domain} unavailable:\n" + "\n".join(outage.lines)
+            )
+            await self._async_call_notify(service, message)
+
+        for domain in list(self._pushed):
+            if domain in outages:
+                continue
+            self._pushed.discard(domain)
+            message = (
+                f"{domain}: alle Entities wieder verfügbar"
+                if use_de
+                else f"{domain}: all entities available again"
+            )
+            await self._async_call_notify(service, message)
+
+    async def _async_call_notify(self, service: str, message: str) -> None:
+        domain, _, service_name = service.partition(".")
+        if not service_name:
+            _LOGGER.warning("Invalid notify service %r — expected e.g. notify.mobile_app_phone", service)
+            return
+        try:
+            await self.hass.services.async_call(
+                domain, service_name, {"title": "Entity Watchguard", "message": message}, blocking=False
+            )
+        except Exception:  # noqa: BLE001 - a broken notifier must not kill the scan
+            _LOGGER.exception("Calling %s failed", service)
+
+    def _async_clear_notifications(self) -> None:
         for notification_id in list(self._notifications):
             persistent_notification.async_dismiss(self.hass, notification_id)
         self._notifications.clear()
+
+    def _async_clear_repairs(self) -> None:
+        for issue_id in list(self._issues):
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+        self._issues.clear()
+
+    def async_clear_notifications(self) -> None:
+        """Service entry point — drops notifications and repair issues alike."""
+        self._async_clear_notifications()
+        self._async_clear_repairs()
+        self._pushed.clear()

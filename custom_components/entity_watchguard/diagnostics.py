@@ -22,6 +22,8 @@ async def async_get_config_entry_diagnostics(
                 "stage1_at": tracked.stage1_at,
                 "stage2_at": tracked.stage2_at,
                 "attempts": tracked.attempts,
+                "stage2_rounds": tracked.stage2_rounds,
+                "given_up": tracked.given_up,
             }
             for entity_id, tracked in coordinator.tracked.items()
         },

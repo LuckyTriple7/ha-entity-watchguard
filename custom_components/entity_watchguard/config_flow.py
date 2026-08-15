@@ -34,11 +34,15 @@ from .const import (
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
     CONF_GRACE_PERIOD,
+    CONF_MAX_RECOVERY_ATTEMPTS,
     CONF_MAX_RELOADS_PER_CYCLE,
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_DELAY,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_SERVICE,
     CONF_RELOAD_COOLDOWN,
+    CONF_REPAIRS_ENABLED,
+    CONF_RETRY_INTERVAL,
     CONF_STAGE1_DELAY,
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
@@ -66,6 +70,16 @@ def _domain_selector(hass: HomeAssistant, selected: list[str]) -> SelectSelector
     options = sorted(available | set(SUGGESTED_DOMAINS) | set(selected))
     return SelectSelector(
         SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN)
+    )
+
+
+@callback
+def _notify_service_selector(hass: HomeAssistant, current: str) -> SelectSelector:
+    """Every notify.* service, e.g. notify.mobile_app_phone. Empty = off."""
+    services = sorted(f"notify.{name}" for name in hass.services.async_services().get("notify", {}))
+    options = [""] + sorted({*services, current} - {""})
+    return SelectSelector(
+        SelectSelectorConfig(options=options, custom_value=True, mode=SelectSelectorMode.DROPDOWN)
     )
 
 
@@ -188,6 +202,14 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
                 ): NumberSelector(
                     NumberSelectorConfig(min=1, max=20, step=1, mode=NumberSelectorMode.BOX)
                 ),
+                vol.Required(
+                    CONF_RETRY_INTERVAL, default=current[CONF_RETRY_INTERVAL]
+                ): _seconds(0, 86400),
+                vol.Required(
+                    CONF_MAX_RECOVERY_ATTEMPTS, default=current[CONF_MAX_RECOVERY_ATTEMPTS]
+                ): NumberSelector(
+                    NumberSelectorConfig(min=0, max=20, step=1, mode=NumberSelectorMode.BOX)
+                ),
             }
         )
         return self.async_show_form(step_id="recovery", data_schema=schema)
@@ -243,8 +265,14 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
                     CONF_NOTIFY_ENABLED, default=current[CONF_NOTIFY_ENABLED]
                 ): BooleanSelector(),
                 vol.Required(
+                    CONF_REPAIRS_ENABLED, default=current[CONF_REPAIRS_ENABLED]
+                ): BooleanSelector(),
+                vol.Required(
                     CONF_NOTIFY_DELAY, default=current[CONF_NOTIFY_DELAY]
                 ): _seconds(0, 86400),
+                vol.Optional(
+                    CONF_NOTIFY_SERVICE, default=current[CONF_NOTIFY_SERVICE]
+                ): _notify_service_selector(self.hass, current[CONF_NOTIFY_SERVICE]),
             }
         )
         return self.async_show_form(step_id="notifications", data_schema=schema)
