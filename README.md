@@ -3,6 +3,8 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![Version](https://img.shields.io/github/v/release/LuckyTriple7/ha-entity-watchguard)](https://github.com/LuckyTriple7/ha-entity-watchguard/releases)
 
+**English** · [Deutsch](README.de.md)
+
 Home Assistant custom integration that watches your entities for the `unavailable` state, reports them per domain, and tries to bring them back — the UI-configurable replacement for a pile of hand-written `unavailable` template sensors.
 
 ## Features
@@ -128,6 +130,16 @@ logger:
   logs:
     custom_components.entity_watchguard: debug
 ```
+
+## Development
+
+```bash
+pip install -r requirements_test.txt
+pytest                    # integration tests
+node tests/card/smoke.js  # renders the card against DOM stubs, no dependencies
+```
+
+The card test asserts on the produced HTML — that no frontend-internal elements are used, that nothing renders as `undefined`, and that the language switching works. Both suites run in CI on every push, alongside hassfest and the HACS validation.
 
 ## Notes
 
