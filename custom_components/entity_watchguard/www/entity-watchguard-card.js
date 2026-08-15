@@ -6,7 +6,9 @@
  * shipped straight out of the integration's www/ folder.
  */
 
-const DOMAIN = "entity_watchguard";
+// The custom element tag — note the dashes. The integration domain
+// (entity_watchguard) is not a valid custom element name.
+const CARD_TAG = "entity-watchguard-card";
 
 const DE = (navigator.language || "en").toLowerCase().startsWith("de");
 const T = DE
@@ -81,11 +83,11 @@ function timeOfDay(iso) {
 
 class EntityWatchguardCard extends HTMLElement {
   static getConfigElement() {
-    return document.createElement("entity-watchguard-card-editor");
+    return document.createElement(`${CARD_TAG}-editor`);
   }
 
   static getStubConfig() {
-    return { type: `custom:${DOMAIN}-card`, ignore_label: "offline" };
+    return { type: `custom:${CARD_TAG}`, ignore_label: "offline" };
   }
 
   constructor() {
@@ -405,12 +407,12 @@ class EntityWatchguardCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("entity-watchguard-card", EntityWatchguardCard);
-customElements.define("entity-watchguard-card-editor", EntityWatchguardCardEditor);
+customElements.define(CARD_TAG, EntityWatchguardCard);
+customElements.define(`${CARD_TAG}-editor`, EntityWatchguardCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "entity-watchguard-card",
+  type: CARD_TAG,
   name: "Entity Watchguard",
   description: DE
     ? "Nicht verfügbare Entities pro Domain, mit Wiederherstellungs-Buttons"

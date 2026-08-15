@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-08-15
+### Fixed
+- Adding the card from the card picker produced `type: custom:entity_watchguard-card` (underscore) and failed with "Custom element doesn't exist". The stub config built the type from the integration domain instead of the element tag — an underscore isn't valid in a custom element name. Existing cards: change the type to `custom:entity-watchguard-card`
+
 ## [0.7.0] - 2026-08-15
 ### Added
 - **Dashboard card** (`custom:entity-watchguard-card`), bundled and self-registering — no Lovelace resource setup. One row per domain with a counter, expandable into the affected entities showing outage duration, recovery attempts and whether Watchguard gave up. Entities open their more-info dialog on click, the label button excludes one from further scans (creating the label if needed), and Check now / Recover now sit at the bottom. Comes with a visual editor and German/English labels
