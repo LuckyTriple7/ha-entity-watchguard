@@ -16,6 +16,16 @@ async def test_domain_and_overall_sensors(hass, setup_watchguard):
     assert light.attributes["unavailable_names"] == ["Kitchen"]
     assert light.attributes["unavailable_since"] is not None
     assert light.attributes["device_class"] == "problem"
+    # Per-entity rows for the dashboard card.
+    assert light.attributes["details"] == [
+        {
+            "entity_id": "light.kitchen",
+            "name": "Kitchen",
+            "since": light.attributes["details"][0]["since"],
+            "attempts": 0,
+            "given_up": False,
+        }
+    ]
 
     assert hass.states.get("binary_sensor.entity_watchguard_switch").state == "off"
 

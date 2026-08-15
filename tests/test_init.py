@@ -42,6 +42,13 @@ async def test_options_update_reloads_entry(hass, setup_watchguard):
     assert coordinator.monitored_domains == ["light"]
 
 
+async def test_frontend_registration_is_skipped_without_http(hass, setup_watchguard):
+    # hass.http is None in the test harness — registration must not raise, and
+    # the guard flag still gets set so a reload doesn't retry it.
+    await setup_watchguard()
+    assert hass.data[DOMAIN]["frontend_registered"] is True
+
+
 async def test_dropped_domain_entity_is_removed(hass, setup_watchguard):
     entry, _ = await setup_watchguard(["light", "switch"])
     assert hass.states.get("binary_sensor.entity_watchguard_switch") is not None

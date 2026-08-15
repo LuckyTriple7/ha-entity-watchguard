@@ -15,6 +15,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - Startup grace period: after a Home Assistant restart the integration stays quiet for a configurable time, because entities need a few minutes to come up
 - Three reporting channels, each switchable: **persistent notifications** (one per domain, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
 - **Check now** / **Recover now** buttons for everything you don't want to wait for
+- Bundled **dashboard card** with per-domain rows, per-entity outage details, and a one-click "ignore this entity" action
 - Light on CPU: one in-memory scan per interval (default 60 s), no template rendering and no state-change listeners. Long entity lists are kept out of the recorder
 
 ## How it works
@@ -32,6 +33,27 @@ unavailable detected
 ```
 
 The record is dropped the moment the entity is available again, so every timer starts fresh on the next outage.
+
+## Dashboard card
+
+A Lovelace card ships with the integration and registers itself — no resource setup needed. Add a card, search for **Entity Watchguard**, or use YAML:
+
+```yaml
+type: custom:entity-watchguard-card
+title: Entity Watchguard      # optional
+show_ok_domains: true         # also list domains with nothing wrong
+show_buttons: true            # Check now / Recover now
+allow_ignore: true            # per-entity "ignore" action
+ignore_label: offline         # label applied by that action
+```
+
+- One row per watched domain with a counter; click to expand the affected entities
+- Each entity shows since when it's been gone, how many recovery attempts ran, and whether Watchguard gave up
+- Click an entity for its more-info dialog
+- The label button applies your ignore label to that entity — it's excluded from the next scan on, provided that label is listed under Configure → Exceptions. The label is created on first use
+- Has a visual editor
+
+> After a HACS update, do a full **restart** (not just a reload) and hard-refresh the browser — the card is served with a version-stamped URL, but the frontend caches aggressively.
 
 ## Installation via HACS
 
@@ -72,7 +94,7 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 
 | Entity | Type | Description |
 |---|---|---|
-| `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `given_up_entities`, `status`, `truncated` |
+| `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `given_up_entities`, `details` (per-entity rows: `entity_id`, `name`, `since`, `attempts`, `given_up`), `status`, `truncated` |
 | `binary_sensor.entity_watchguard_problem` | problem | ON when any watched domain has a problem. Attributes: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | count | Total across all watched domains, `per_domain` breakdown in the attributes |
 | `sensor.entity_watchguard_last_recovery_attempt` | timestamp | Diagnostic |

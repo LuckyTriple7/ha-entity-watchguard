@@ -121,6 +121,9 @@ class DomainReport:
     entity_ids: list[str] = field(default_factory=list)
     names: list[str] = field(default_factory=list)
     given_up: list[str] = field(default_factory=list)
+    # Per-entity rows for the dashboard card; the lists above stay for
+    # templates and automations that already use them.
+    details: list[dict] = field(default_factory=list)
     since: datetime | None = None
     attempts: int = 0
 
@@ -283,6 +286,15 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             report.attempts += tracked.attempts
             if tracked.given_up:
                 report.given_up.append(entity_id)
+            report.details.append(
+                {
+                    "entity_id": entity_id,
+                    "name": tracked.name,
+                    "since": dt_util.as_local(tracked.first_unavailable).isoformat(),
+                    "attempts": tracked.attempts,
+                    "given_up": tracked.given_up,
+                }
+            )
             if report.since is None or tracked.first_unavailable < report.since:
                 report.since = tracked.first_unavailable
 

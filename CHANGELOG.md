@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-08-15
+### Added
+- **Dashboard card** (`custom:entity-watchguard-card`), bundled and self-registering — no Lovelace resource setup. One row per domain with a counter, expandable into the affected entities showing outage duration, recovery attempts and whether Watchguard gave up. Entities open their more-info dialog on click, the label button excludes one from further scans (creating the label if needed), and Check now / Recover now sit at the bottom. Comes with a visual editor and German/English labels
+- Domain sensors expose a new `details` attribute — per-entity rows (`entity_id`, `name`, `since`, `attempts`, `given_up`) that the card renders. Kept out of the recorder like the other lists
+
 ## [0.6.0] - 2026-08-15
 ### Added
 - Stage 2 now only reloads a config entry when a large enough share of **its** entities is unavailable (new option, default 50 %, `0` disables the check). Hub integrations have a single config entry for hundreds of entities, so one dead MQTT sensor would otherwise restart the whole broker — taking every other MQTT entity down with it, without fixing a device that is simply offline. If the rest of the hub dies later, the next retry round reloads after all
