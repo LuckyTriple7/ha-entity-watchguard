@@ -3,6 +3,8 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![Version](https://img.shields.io/github/v/release/LuckyTriple7/ha-entity-watchguard)](https://github.com/LuckyTriple7/ha-entity-watchguard/releases)
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/luckytriple7)
+
 [English](README.md) · **Deutsch**
 
 Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwacht, sie pro Domain meldet und versucht, sie zurückzuholen — der über die Oberfläche konfigurierbare Ersatz für einen Stapel handgeschriebener `unavailable`-Template-Sensoren.
