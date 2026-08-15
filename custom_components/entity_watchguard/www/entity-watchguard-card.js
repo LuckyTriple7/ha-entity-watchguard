@@ -24,6 +24,8 @@ const T = DE
       gaveUp: "aufgegeben",
       ignore: (label) => `Ignorieren (Label „${label}")`,
       ignored: "Label gesetzt",
+      checked: "Geprüft",
+      recovering: "Wiederherstellung gestartet",
       failed: "Fehlgeschlagen",
       noSensors: "Keine Entity-Watchguard-Sensoren gefunden.",
       more: (n) => `… und ${n} weitere`,
@@ -40,6 +42,8 @@ const T = DE
       gaveUp: "gave up",
       ignore: (label) => `Ignore (label "${label}")`,
       ignored: "Label applied",
+      checked: "Checked",
+      recovering: "Recovery started",
       failed: "Failed",
       noSensors: "No Entity Watchguard sensors found.",
       more: (n) => `… and ${n} more`,
@@ -141,19 +145,42 @@ class EntityWatchguardCard extends HTMLElement {
   }
 
   _button(suffix) {
-    return this._hass
-      ? Object.keys(this._hass.states).find((id) =>
-          id === `button.entity_watchguard_${suffix}`
-        )
-      : undefined;
+    if (!this._hass) return undefined;
+    // Tolerates renamed entity ids (…_check_now_2) and a renamed device.
+    return Object.keys(this._hass.states).find(
+      (id) => id.startsWith("button.") && id.includes(`entity_watchguard`) && id.includes(suffix)
+    );
   }
 
   // --- actions -------------------------------------------------------
-  _press(suffix) {
+  async _press(suffix, element) {
     const entityId = this._button(suffix);
-    if (entityId) {
-      this._hass.callService("button", "press", { entity_id: entityId });
+    if (!entityId) {
+      this._banner(`${T.failed}: button.…_${suffix}`);
+      return;
     }
+    const label = element.textContent;
+    element.disabled = true;
+    element.textContent = "…";
+    try {
+      await this._hass.callService("button", "press", { entity_id: entityId });
+      this._banner(suffix === "check_now" ? T.checked : T.recovering);
+    } catch (err) {
+      this._banner(`${T.failed}: ${err.message || err}`);
+    } finally {
+      element.disabled = false;
+      element.textContent = label;
+    }
+  }
+
+  _banner(text) {
+    this._bannerText = text;
+    this._render();
+    clearTimeout(this._bannerTimer);
+    this._bannerTimer = setTimeout(() => {
+      this._bannerText = null;
+      this._render();
+    }, 4000);
   }
 
   _moreInfo(entityId) {
@@ -275,10 +302,10 @@ class EntityWatchguardCard extends HTMLElement {
             </div>
             ${
               this._config.allow_ignore
-                ? `<ha-icon-button class="ignore" data-ignore="${item.entity_id}"
+                ? `<button class="ignore" data-ignore="${item.entity_id}"
                      title="${T.ignore(this._config.ignore_label || "offline")}">
                      <ha-icon icon="mdi:label-off-outline"></ha-icon>
-                   </ha-icon-button>`
+                   </button>`
                 : ""
             }
           </div>
@@ -290,11 +317,17 @@ class EntityWatchguardCard extends HTMLElement {
       html += `</div>`;
     }
 
+    if (this._bannerText) {
+      html += `<div class="banner">${this._bannerText}</div>`;
+    }
+
     if (this._config.show_buttons) {
+      // Plain <button>s on purpose: mwc-button / ha-icon-button are frontend
+      // internals and aren't reliably registered for custom cards.
       html += `
         <div class="actions">
-          <mwc-button data-press="check_now">${T.check}</mwc-button>
-          <mwc-button data-press="recover_now">${T.recover}</mwc-button>
+          <button class="action" data-press="check_now">${T.check}</button>
+          <button class="action" data-press="recover_now">${T.recover}</button>
         </div>`;
     }
 
@@ -313,7 +346,7 @@ class EntityWatchguardCard extends HTMLElement {
       })
     );
     card.querySelectorAll("[data-press]").forEach((element) =>
-      element.addEventListener("click", () => this._press(element.dataset.press))
+      element.addEventListener("click", () => this._press(element.dataset.press, element))
     );
   }
 }
@@ -351,11 +384,32 @@ EntityWatchguardCard.styles = `
     background: var(--error-color, #db4437); color: #fff;
   }
   .note { font-size: .75rem; color: var(--secondary-text-color); padding: 2px 0 6px; }
-  .ignore { --mdc-icon-size: 20px; color: var(--secondary-text-color); }
-  .actions {
-    display: flex; justify-content: flex-end; gap: 4px;
-    border-top: 1px solid var(--divider-color); margin-top: 8px; padding: 4px;
+  .banner {
+    margin: 4px 8px 0; padding: 6px 10px; border-radius: 8px;
+    font-size: .85rem;
+    background: var(--secondary-background-color);
+    color: var(--primary-text-color);
   }
+  .ignore {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; padding: 0;
+    border: none; border-radius: 50%; cursor: pointer;
+    background: none; color: var(--secondary-text-color);
+    --mdc-icon-size: 20px;
+  }
+  .ignore:hover { background: var(--secondary-background-color); color: var(--primary-text-color); }
+  .actions {
+    display: flex; justify-content: flex-end; gap: 8px;
+    border-top: 1px solid var(--divider-color); margin-top: 8px; padding: 8px 4px;
+  }
+  .action {
+    font: inherit; font-size: .9rem; font-weight: 500;
+    padding: 6px 14px; border-radius: 18px; cursor: pointer;
+    border: 1px solid var(--divider-color);
+    background: none; color: var(--primary-color, #03a9f4);
+  }
+  .action:hover:not([disabled]) { background: var(--secondary-background-color); }
+  .action[disabled] { opacity: .5; cursor: default; }
 `;
 
 class EntityWatchguardCardEditor extends HTMLElement {
@@ -381,27 +435,44 @@ class EntityWatchguardCardEditor extends HTMLElement {
   _render() {
     if (!this._config) return;
     const conf = this._config;
+    // Native inputs, same reasoning as the card itself: no dependency on
+    // frontend-internal elements that may not be registered.
+    const check = (key, label) => `
+      <label class="ewg-row">
+        <input type="checkbox" id="${key}" ${conf[key] !== false ? "checked" : ""}>
+        <span>${label}</span>
+      </label>`;
+
     this.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:12px;padding:8px 0;">
-        <ha-textfield label="${DE ? "Titel" : "Title"}"
-          value="${conf.title ?? T.title}" id="title"></ha-textfield>
-        <ha-textfield label="${DE ? "Label zum Ignorieren" : "Label used for ignoring"}"
-          value="${conf.ignore_label ?? "offline"}" id="ignore_label"></ha-textfield>
-        <ha-formfield label="${DE ? "Saubere Domains anzeigen" : "Show clean domains"}">
-          <ha-switch id="show_ok_domains" ${conf.show_ok_domains !== false ? "checked" : ""}></ha-switch>
-        </ha-formfield>
-        <ha-formfield label="${DE ? "Buttons anzeigen" : "Show buttons"}">
-          <ha-switch id="show_buttons" ${conf.show_buttons !== false ? "checked" : ""}></ha-switch>
-        </ha-formfield>
-        <ha-formfield label="${DE ? "Ignorieren erlauben" : "Allow ignoring"}">
-          <ha-switch id="allow_ignore" ${conf.allow_ignore !== false ? "checked" : ""}></ha-switch>
-        </ha-formfield>
+      <style>
+        .ewg-form { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+        .ewg-field { display: flex; flex-direction: column; gap: 4px; }
+        .ewg-field span { font-size: .8rem; color: var(--secondary-text-color); }
+        .ewg-field input {
+          font: inherit; padding: 8px; border-radius: 4px;
+          border: 1px solid var(--divider-color);
+          background: var(--card-background-color); color: var(--primary-text-color);
+        }
+        .ewg-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+      </style>
+      <div class="ewg-form">
+        <label class="ewg-field">
+          <span>${DE ? "Titel" : "Title"}</span>
+          <input type="text" id="title" value="${conf.title ?? T.title}">
+        </label>
+        <label class="ewg-field">
+          <span>${DE ? "Label zum Ignorieren" : "Label used for ignoring"}</span>
+          <input type="text" id="ignore_label" value="${conf.ignore_label ?? "offline"}">
+        </label>
+        ${check("show_ok_domains", DE ? "Saubere Domains anzeigen" : "Show clean domains")}
+        ${check("show_buttons", DE ? "Buttons anzeigen" : "Show buttons")}
+        ${check("allow_ignore", DE ? "Ignorieren erlauben" : "Allow ignoring")}
       </div>`;
 
-    this.querySelectorAll("ha-textfield").forEach((field) =>
+    this.querySelectorAll('input[type="text"]').forEach((field) =>
       field.addEventListener("input", () => this._emit({ [field.id]: field.value }))
     );
-    this.querySelectorAll("ha-switch").forEach((toggle) =>
+    this.querySelectorAll('input[type="checkbox"]').forEach((toggle) =>
       toggle.addEventListener("change", () => this._emit({ [toggle.id]: toggle.checked }))
     );
   }

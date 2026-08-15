@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2026-08-15
+### Fixed
+- The card's buttons rendered as plain text ("Jetzt prüfen Wiederherstellen") and the per-entity label button escaped the card's bounds: both used frontend-internal elements (`mwc-button`, `ha-icon-button`) that aren't reliably registered for custom cards. They are plain styled `<button>`s now, as are the editor's inputs
+- Pressing a button gives feedback: the button shows a busy state and a short confirmation appears in the card. Previously nothing was visible when nothing was wrong, which was indistinguishable from a broken button
+- The card finds its buttons even if the entity ids were renamed, and says so on the card when it can't find them at all
+
 ## [0.7.1] - 2026-08-15
 ### Fixed
 - Adding the card from the card picker produced `type: custom:entity_watchguard-card` (underscore) and failed with "Custom element doesn't exist". The stub config built the type from the integration domain instead of the element tag — an underscore isn't valid in a custom element name. Existing cards: change the type to `custom:entity-watchguard-card`
