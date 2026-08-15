@@ -1,0 +1,77 @@
+name: Request a feature for Entity Watchguard
+description: Suggest a new feature or an enhancement to an existing one.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue form is for feature requests only!
+
+        If something is broken, please [report a bug instead][bug].
+
+        [bug]: https://github.com/LuckyTriple7/ha-entity-watchguard/issues/new?template=bug_report.yml
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the [existing issues](https://github.com/LuckyTriple7/ha-entity-watchguard/issues?q=is%3Aissue) and this has not been requested yet.
+          required: true
+        - label: This is a request for Entity Watchguard, not for Home Assistant Core or for the integration that owns the unavailable entities.
+          required: true
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: The problem you are trying to solve
+      description: >-
+        A clear and concise description of what you are missing today.
+        Tell us what you are trying to achieve, not only the solution you have in mind.
+      placeholder: |
+        I want to know when ... but the integration currently only ...
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Proposed solution
+      description: A clear and concise description of what you want to happen.
+  - type: dropdown
+    id: area
+    validations:
+      required: true
+    attributes:
+      label: Which part of the integration does this affect?
+      options:
+        - Detection (which states or entities are watched)
+        - Exceptions (new way of excluding entities)
+        - Recovery (new stage, different strategy, per-integration handling)
+        - Timings and grace periods
+        - Notifications / repair issues / notify service
+        - Sensors and their attributes
+        - Buttons, services and actions
+        - Dashboard card
+        - Config flow / options UI
+        - Diagnostics
+        - Translations
+        - Documentation
+        - Other / not sure
+  - type: textarea
+    id: recovery_context
+    attributes:
+      label: "For recovery-related requests: which integration and device?"
+      description: >-
+        Recovery behaviour differs a lot between integrations. If this is about
+        bringing entities back, tell us which integration provides them (e.g. `mqtt`,
+        `zha`, `esphome`), whether it is push or polling, and what makes them come
+        back manually today (reload, restart, power cycle …).
+  - type: textarea
+    attributes:
+      label: Alternatives you considered
+      description: >-
+        Template sensors, automations, other integrations or manual workflows you
+        already tried, and why they do not solve the problem.
+  - type: textarea
+    attributes:
+      label: Additional information
+      description: >
+        Links, mockups, screenshots or anything else that helps explain the request.

@@ -1,0 +1,209 @@
+name: Report an issue with Entity Watchguard
+description: Report a bug in the Entity Watchguard custom integration.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue form is for reporting bugs only!
+
+        If you have a feature or enhancement request, please [use the feature request form instead][fr].
+
+        **Before reporting "nothing is detected":** check the `status` attribute of a domain
+        sensor. `warming_up` means the startup grace period is still running — press the
+        **Check now** button to end it immediately.
+
+        [fr]: https://github.com/LuckyTriple7/ha-entity-watchguard/issues/new?template=feature_request.yml
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the [existing issues](https://github.com/LuckyTriple7/ha-entity-watchguard/issues?q=is%3Aissue) and this problem has not been reported yet.
+          required: true
+        - label: I am running the latest released version of this integration.
+          required: true
+        - label: I restarted Home Assistant after installing or updating the integration (a reload is not enough for new platforms, translations or the dashboard card).
+          required: true
+        - label: The affected entities are in `unavailable` state, not `unknown` — Entity Watchguard only reports `unavailable` by design.
+          required: true
+        - label: The affected domain is actually selected under Configure → Monitored domains, and the entities are not covered by an exception.
+          required: true
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: The problem
+      description: >-
+        Describe the issue you are experiencing here. Tell us what you expected to
+        happen and what happened instead.
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Environment
+  - type: input
+    id: integration_version
+    validations:
+      required: true
+    attributes:
+      label: What version of Entity Watchguard has the issue?
+      placeholder: "0.7.3"
+      description: >-
+        Can be found in HACS, or as the `version` field in
+        `custom_components/entity_watchguard/manifest.json`.
+  - type: input
+    id: last_working_version
+    attributes:
+      label: What was the last working version of Entity Watchguard?
+      placeholder: "0.7.0"
+      description: If known, otherwise leave blank.
+  - type: input
+    id: ha_version
+    validations:
+      required: true
+    attributes:
+      label: What version of Home Assistant Core are you running?
+      placeholder: core-
+      description: >
+        Can be found in: [Settings ⇒ System ⇒ Repairs ⇒ Three Dots in Upper Right ⇒ System information](https://my.home-assistant.io/redirect/system_health/).
+
+        [![Open your Home Assistant instance and show the system information.](https://my.home-assistant.io/badges/system_health.svg)](https://my.home-assistant.io/redirect/system_health/)
+  - type: dropdown
+    id: installation_type
+    validations:
+      required: true
+    attributes:
+      label: What type of installation are you running?
+      description: >
+        Can be found in: [Settings ⇒ System ⇒ Repairs ⇒ Three Dots in Upper Right ⇒ System information](https://my.home-assistant.io/redirect/system_health/).
+      options:
+        - Home Assistant OS
+        - Home Assistant Container
+        - Home Assistant Supervised
+        - Home Assistant Core
+  - type: dropdown
+    id: installation_method
+    validations:
+      required: true
+    attributes:
+      label: How did you install Entity Watchguard?
+      options:
+        - HACS
+        - Manual copy into custom_components
+  - type: dropdown
+    id: area
+    validations:
+      required: true
+    attributes:
+      label: Which part of the integration is affected?
+      options:
+        - Setup / config flow (picking domains)
+        - Options (timings, recovery, exceptions, notifications)
+        - Detection (entities not reported, or reported when they should not be)
+        - Exceptions (label / entity / device / area / integration / pattern)
+        - Startup grace period ("warming_up" never ends, or ends too early)
+        - Recovery stage 1 (update_entity)
+        - Recovery stage 2 (config entry reload)
+        - Giving up / retry interval
+        - Persistent notifications
+        - Repair issues
+        - Notify service (mobile push)
+        - Dashboard card
+        - Buttons (Check now / Recover now) or services
+        - Sensor attributes
+        - Translations
+        - Other / not sure
+  - type: textarea
+    id: monitored_domains
+    validations:
+      required: true
+    attributes:
+      label: Which domains are you monitoring?
+      placeholder: "light, switch, sensor, binary_sensor"
+  - type: input
+    id: entity_count
+    attributes:
+      label: Roughly how many entities does your instance have?
+      placeholder: "about 1200"
+      description: Helps judge performance-related reports.
+  - type: textarea
+    id: settings
+    attributes:
+      label: Relevant settings
+      description: >-
+        Startup delay, check interval, grace period, stage 1/2 on-off and delays,
+        notify delay — whatever relates to the problem. Defaults are fine to state as "defaults".
+      placeholder: |
+        Startup delay: 300 s (default)
+        Grace period: 120 s (default)
+        Stage 2: enabled, after 900 s, reload only above 50 %
+  - type: textarea
+    id: affected_entities
+    attributes:
+      label: Which entities/integrations are affected?
+      description: >-
+        Entity IDs plus the integration providing them (e.g. `switch.pump` from `mqtt`).
+        Anonymise names if you consider them private.
+
+  - type: markdown
+    attributes:
+      value: |
+        # Details
+  - type: textarea
+    id: sensor_state
+    attributes:
+      label: State and attributes of the affected domain sensor
+      description: >-
+        Developer tools ⇒ States ⇒ `binary_sensor.entity_watchguard_<domain>`.
+        The `status`, `count` and `details` attributes are the most useful ones.
+      render: yaml
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Set a device to unavailable (or unplug it)
+        2. Wait for the grace period / press Check now
+        3. The sensor shows ...
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics information
+      placeholder: "drag-and-drop the diagnostics data file here (do not copy-and-paste the content)"
+      description: >-
+        Entity Watchguard provides [diagnostic data](https://www.home-assistant.io/docs/configuration/troubleshooting/#debug-logs-and-diagnostics):
+        Settings ⇒ Devices & Services ⇒ Entity Watchguard ⇒ Three Dots ⇒ Download diagnostics.
+
+        It contains the current options and every tracked outage with its timers —
+        by far the most useful thing you can attach.
+  - type: textarea
+    id: card_config
+    attributes:
+      label: Card configuration
+      description: If the dashboard card is affected, paste its YAML here.
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything in the logs that might be useful?
+      description: |
+        Enable debug logging by adding this to `configuration.yaml`, restarting Home Assistant, and reproducing the problem:
+
+        ```yaml
+        logger:
+          default: warning
+          logs:
+            custom_components.entity_watchguard: debug
+        ```
+
+        Then paste the relevant lines from Settings ⇒ System ⇒ Logs. For card problems,
+        the browser console (F12) is usually the place to look.
+      render: txt
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional information
+      description: >
+        If you have any additional information for us, use the field below.
+        Screenshots are welcome.
