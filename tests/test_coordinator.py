@@ -203,6 +203,45 @@ async def test_notification_created_and_dismissed(hass, setup_watchguard):
         notifications.async_dismiss.assert_called_once_with(hass, "entity_watchguard_light")
 
 
+async def test_logs_outage_and_recovery(hass, setup_watchguard, update_entity_calls, caplog):
+    hass.states.async_set("light.kitchen", "unavailable")
+    _, coordinator = await setup_watchguard(
+        **{CONF_STAGE1_ENABLED: True, CONF_STAGE1_DELAY: 300}
+    )
+    assert "Now unavailable (1): light.kitchen" in caplog.text
+
+    backdate(coordinator, 400)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert "Stage 1 (update_entity) for 1 entities: light.kitchen" in caplog.text
+
+    hass.states.async_set("light.kitchen", "on")
+    await coordinator.async_refresh()
+    assert "Available again (1): light.kitchen" in caplog.text
+    assert "1 attempt(s): stage 1" in caplog.text
+
+
+async def test_failed_reload_is_logged_as_error(hass, setup_watchguard, caplog):
+    other = MockConfigEntry(domain="demo")
+    other.add_to_hass(hass)
+    other.mock_state(hass, ConfigEntryState.LOADED)
+    _register_entity(hass, other, "light", "kitchen")
+
+    _, coordinator = await setup_watchguard(
+        **{CONF_STAGE2_ENABLED: True, CONF_STAGE2_DELAY: 900}
+    )
+    backdate(coordinator, 1000)
+
+    with patch.object(
+        hass.config_entries, "async_reload", new_callable=AsyncMock, side_effect=RuntimeError("boom")
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert "reloading config entry" in caplog.text
+    assert "boom" in caplog.text
+
+
 async def test_recover_now_service(hass, setup_watchguard, update_entity_calls):
     hass.states.async_set("light.kitchen", "unavailable")
     hass.states.async_set("switch.pump", "unavailable")

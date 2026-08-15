@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-08-15
+### Added
+- Log line (INFO) whenever entities go unavailable or come back — the recovery line includes how long the entity was gone and which stages ran, so the HA log shows what happened without turning on debug
+- Stage 1 now logs at INFO (was DEBUG) with the entities it re-polls; stage 2 states explicitly that stage 1 did not bring them back
+- A failing stage 2 reload is logged as an ERROR with a traceback instead of surfacing as a bare "Task exception was never retrieved"
+- README section on enabling debug logging
+
 ## [0.1.0] - 2026-08-15
 ### Added
 - Initial release — replaces the hand-written `unavailable` template sensors with a UI-configured integration

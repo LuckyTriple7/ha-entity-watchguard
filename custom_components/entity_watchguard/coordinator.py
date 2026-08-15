@@ -36,6 +36,19 @@ from .filters import build_exclusion
 _LOGGER = logging.getLogger(__name__)
 
 
+def _outcome(entity_id: str, tracked: "Tracked", now: datetime) -> str:
+    """How long an entity was gone, and whether we did anything about it."""
+    minutes = (now - tracked.first_unavailable).total_seconds() / 60
+    if not tracked.attempts:
+        return f"{entity_id} (after {minutes:.1f} min)"
+    stages = []
+    if tracked.stage1_at is not None:
+        stages.append("stage 1")
+    if tracked.stage2_at is not None:
+        stages.append("stage 2")
+    return f"{entity_id} (after {minutes:.1f} min, {tracked.attempts} attempt(s): {', '.join(stages)})"
+
+
 @dataclass(slots=True)
 class Tracked:
     """One entity's current unavailability episode.
@@ -134,6 +147,7 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
     def _async_scan(self, now: datetime) -> None:
         exclusion = build_exclusion(self.hass, self.options)
         seen: set[str] = set()
+        appeared: list[str] = []
 
         for state in self.hass.states.async_all(self.monitored_domains):
             if state.state != STATE_UNAVAILABLE or exclusion.excludes(state.entity_id):
@@ -141,12 +155,22 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             seen.add(state.entity_id)
             if (tracked := self._tracked.get(state.entity_id)) is None:
                 self._tracked[state.entity_id] = Tracked(first_unavailable=now, name=state.name)
+                appeared.append(state.entity_id)
             else:
                 tracked.name = state.name
 
         # Recovered, removed, or newly excluded — either way, stop tracking.
+        gone: list[str] = []
         for entity_id in set(self._tracked) - seen:
-            del self._tracked[entity_id]
+            tracked = self._tracked.pop(entity_id)
+            gone.append(_outcome(entity_id, tracked, now))
+
+        # One line per cycle instead of one per entity: an integration going
+        # down takes all of its entities with it.
+        if appeared:
+            _LOGGER.info("Now unavailable (%d): %s", len(appeared), ", ".join(sorted(appeared)))
+        if gone:
+            _LOGGER.info("Available again (%d): %s", len(gone), ", ".join(sorted(gone)))
 
     def _build_data(self, now: datetime) -> dict:
         grace = timedelta(seconds=self.options[CONF_GRACE_PERIOD])
@@ -194,7 +218,11 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
     async def async_stage1(self, entity_ids: list[str], now: datetime | None = None) -> None:
         """Stage 1: ask HA to poll the entities again."""
         now = now or dt_util.utcnow()
-        _LOGGER.debug("Stage 1 (update_entity) for %s", entity_ids)
+        _LOGGER.info(
+            "Stage 1 (update_entity) for %d entities: %s",
+            len(entity_ids),
+            ", ".join(sorted(entity_ids)),
+        )
         for entity_id in entity_ids:
             if (tracked := self._tracked.get(entity_id)) is not None:
                 tracked.stage1_at = now
@@ -235,16 +263,19 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
 
             target = self.hass.config_entries.async_get_entry(config_entry_id)
             if target is None or target.state is not ConfigEntryState.LOADED:
+                _LOGGER.debug(
+                    "Stage 2: skipping %s — config entry gone or not loaded", affected
+                )
                 for entity_id in affected:
                     if (tracked := self._tracked.get(entity_id)) is not None:
                         tracked.stage2_at = now
                 continue
 
             _LOGGER.info(
-                "Stage 2: reloading config entry %s (%s) for %s",
+                "Stage 2: stage 1 did not bring back %s — reloading config entry %s (%s)",
+                affected,
                 target.title,
                 target.domain,
-                affected,
             )
             self._reloaded_at[config_entry_id] = now
             self.last_recovery = now
@@ -255,9 +286,19 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                     tracked.attempts += 1
             self.entry.async_create_background_task(
                 self.hass,
-                self.hass.config_entries.async_reload(config_entry_id),
+                self._async_reload(config_entry_id, target.title),
                 f"{DOMAIN}_reload_{config_entry_id}",
             )
+
+    async def _async_reload(self, config_entry_id: str, title: str) -> None:
+        """Reload wrapper — a failing reload must surface as our error, not as
+        a bare "Task exception was never retrieved" from the event loop."""
+        try:
+            await self.hass.config_entries.async_reload(config_entry_id)
+        except Exception:  # noqa: BLE001 - background task, log everything
+            _LOGGER.exception("Stage 2: reloading config entry %s failed", title)
+        else:
+            _LOGGER.debug("Stage 2: reload of config entry %s finished", title)
 
     async def async_recover_now(
         self,

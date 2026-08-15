@@ -60,6 +60,23 @@ During the startup grace period every sensor stays `off` and reports `status: wa
 - `entity_watchguard.recover_now` — recover right now, ignoring the configured delays. Optional `domain`, `entity_id`, and `escalate: true` to also run stage 2.
 - `entity_watchguard.clear_notifications` — dismiss all notifications created by this integration.
 
+## Logging
+
+Everything is written to the regular Home Assistant log under `custom_components.entity_watchguard`:
+
+| Level | What |
+|---|---|
+| INFO | Entities going unavailable and coming back (including how long they were gone and which recovery stages ran), stage 1 and stage 2 attempts |
+| WARNING | An exclusion pattern that isn't a valid regex (it is skipped) |
+| ERROR | A stage 2 config entry reload that failed, with traceback |
+| DEBUG | When the startup grace period ends, skipped reloads, reload completions |
+
+```yaml
+logger:
+  logs:
+    custom_components.entity_watchguard: debug
+```
+
 ## Notes
 
 - Entities that are not in the entity registry (YAML/template entities) can only be exempted via **patterns** or the **entity** picker; label/device/area exemptions need a registry entry.
