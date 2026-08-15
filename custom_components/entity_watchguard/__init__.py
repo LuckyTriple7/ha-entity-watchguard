@@ -1,12 +1,15 @@
 """The Entity Watchguard integration."""
 from __future__ import annotations
 
+import logging
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     ATTR_DOMAIN,
@@ -16,6 +19,8 @@ from .const import (
     SERVICE_RECOVER_NOW,
 )
 from .coordinator import WatchguardCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["binary_sensor", "button", "sensor"]
 
@@ -31,8 +36,10 @@ RECOVER_NOW_SCHEMA = vol.Schema(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = WatchguardCoordinator(hass, entry)
     coordinator.async_setup_activation()
+    coordinator.async_setup_registry_listeners()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
+    _async_remove_stale_entities(hass, entry, coordinator)
     await coordinator.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
@@ -55,6 +62,32 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             for service in (SERVICE_RECOVER_NOW, SERVICE_CLEAR_NOTIFICATIONS):
                 hass.services.async_remove(DOMAIN, service)
     return unload_ok
+
+
+def _async_remove_stale_entities(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: WatchguardCoordinator
+) -> None:
+    """Drop entities for domains that are no longer watched.
+
+    Otherwise dropping e.g. `camera` from the selection leaves
+    binary_sensor.entity_watchguard_camera behind as a permanently
+    unavailable leftover.
+    """
+    expected = {
+        f"{entry.entry_id}_problem",
+        f"{entry.entry_id}_total_unavailable",
+        f"{entry.entry_id}_last_recovery",
+        f"{entry.entry_id}_check_now",
+        f"{entry.entry_id}_recover_now",
+        *(f"{entry.entry_id}_{domain}_problem" for domain in coordinator.monitored_domains),
+    }
+    registry = er.async_get(hass)
+    for registry_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registry_entry.unique_id not in expected:
+            _LOGGER.info(
+                "Removing %s — its domain is no longer watched", registry_entry.entity_id
+            )
+            registry.async_remove(registry_entry.entity_id)
 
 
 def _coordinators(hass: HomeAssistant) -> list[WatchguardCoordinator]:

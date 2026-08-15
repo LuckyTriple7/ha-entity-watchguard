@@ -72,7 +72,9 @@ DEFAULT_MAX_RELOADS_PER_CYCLE = 3
 DEFAULT_NOTIFY_ENABLED = True
 DEFAULT_NOTIFY_DELAY = 900
 
-DEFAULT_EXCLUDE_LABELS = ["offline", "temp_offline"]
+# Deliberately empty: label names are per-instance, so guessing "offline" here
+# would silently hide entities in setups that use that label for something else.
+DEFAULT_EXCLUDE_LABELS: list[str] = []
 
 # --- service names ------------------------------------------------------
 SERVICE_RECOVER_NOW = "recover_now"

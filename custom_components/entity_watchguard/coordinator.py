@@ -8,8 +8,11 @@ from datetime import datetime, timedelta
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import label_registry as lr
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -31,7 +34,7 @@ from .const import (
     NOTIFICATION_ID_PREFIX,
     effective_options,
 )
-from .filters import build_exclusion
+from .filters import Exclusion, build_exclusion
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,6 +99,10 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._notifications: dict[str, str] = {}
         # None until HA has finished starting; see async_setup_activation().
         self._active_at: datetime | None = None
+        # Resolving labels/devices/areas walks the whole entity registry, which
+        # only changes when the user edits something — so cache it and let the
+        # registry events invalidate it. See async_setup_registry_listeners().
+        self._exclusion: Exclusion | None = None
 
     # --- lifecycle ------------------------------------------------------
     @property
@@ -125,6 +132,21 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.debug("Watchguard arms at %s", self._active_at)
 
         self.entry.async_on_unload(async_at_started(self.hass, _started))
+
+    def async_setup_registry_listeners(self) -> None:
+        """Drop the cached exclusion set whenever a registry changes."""
+
+        @callback
+        def _invalidate(_event: Event) -> None:
+            self._exclusion = None
+
+        for event_type in (
+            er.EVENT_ENTITY_REGISTRY_UPDATED,
+            dr.EVENT_DEVICE_REGISTRY_UPDATED,
+            ar.EVENT_AREA_REGISTRY_UPDATED,
+            lr.EVENT_LABEL_REGISTRY_UPDATED,
+        ):
+            self.entry.async_on_unload(self.hass.bus.async_listen(event_type, _invalidate))
 
     async def async_check_now(self) -> None:
         """Scan right now — pressing the button also ends the startup grace
@@ -156,7 +178,9 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         return self._build_data(now)
 
     def _async_scan(self, now: datetime) -> None:
-        exclusion = build_exclusion(self.hass, self.options)
+        if self._exclusion is None:
+            self._exclusion = build_exclusion(self.hass, self.options)
+        exclusion = self._exclusion
         seen: set[str] = set()
         appeared: list[str] = []
 

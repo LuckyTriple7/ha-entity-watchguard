@@ -9,6 +9,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.entity_watchguard.filters import build_exclusion
+
 from custom_components.entity_watchguard.const import (
     CONF_GRACE_PERIOD,
     CONF_MAX_RELOADS_PER_CYCLE,
@@ -240,6 +242,26 @@ async def test_failed_reload_is_logged_as_error(hass, setup_watchguard, caplog):
 
     assert "reloading config entry" in caplog.text
     assert "boom" in caplog.text
+
+
+async def test_exclusion_is_cached_until_a_registry_changes(hass, setup_watchguard):
+    _, coordinator = await setup_watchguard()
+
+    with patch(
+        "custom_components.entity_watchguard.coordinator.build_exclusion",
+        wraps=build_exclusion,
+    ) as build:
+        await coordinator.async_refresh()
+        await coordinator.async_refresh()
+        await coordinator.async_refresh()
+        # Built once, then served from the cache — registering our own entities
+        # during setup already invalidated whatever was there before.
+        assert build.call_count == 1
+
+        er.async_get(hass).async_get_or_create("light", "demo", "kitchen")
+        await hass.async_block_till_done()
+        await coordinator.async_refresh()
+        assert build.call_count == 2
 
 
 async def test_recover_now_service(hass, setup_watchguard, update_entity_calls):

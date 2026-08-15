@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-08-15
+### Changed
+- **Breaking-ish:** the labels `offline` and `temp_offline` are no longer pre-filled as default exceptions. Label names are per-instance — guessing them silently hid entities in setups that use those labels for something else. If you relied on them, set them once under Configure → Exceptions
+- Entity lists in the attributes are capped at 50 entries (`truncated: true` marks the cut, `count` stays exact) and are excluded from the recorder — a large outage no longer writes the same long list into the database on every scan
+- Label/device/area exceptions are resolved once and cached, invalidated by entity/device/area/label registry events, instead of walking the whole entity registry on every scan
+
+### Fixed
+- Removing a domain from the watched list now deletes its binary sensor instead of leaving it behind as a permanently unavailable leftover
+
 ## [0.2.0] - 2026-08-15
 ### Added
 - **Check now** button — scans immediately instead of waiting for the check interval. Pressing it also ends the startup grace period early, so a manual check right after a restart actually returns something

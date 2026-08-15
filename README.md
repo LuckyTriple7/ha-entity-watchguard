@@ -36,7 +36,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 | Recovery | Stage 2 (reload config entry) | off, after 900 s | More effective, but all entities of that integration disappear briefly |
 | Recovery | Reload cooldown | 3600 s | Minimum distance between two reloads of the same config entry |
 | Recovery | Max reloads per check | 3 | Guards against a reload storm |
-| Exceptions | Labels | `offline`, `temp_offline` | Set on an entity, device or area |
+| Exceptions | Labels | – | Set on an entity, device or area; e.g. an `offline` label for devices you knowingly powered down |
 | Exceptions | Entities / Devices / Areas | – | Explicit pickers |
 | Exceptions | Patterns | – | Regex against the entity ID, e.g. `.*_internet_access$` |
 | Notifications | Enabled | on | One persistent notification per domain |
@@ -48,7 +48,7 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 
 | Entity | Type | Description |
 |---|---|---|
-| `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `status` |
+| `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `status`, `truncated` |
 | `binary_sensor.entity_watchguard_problem` | problem | ON when any watched domain has a problem. Attributes: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | count | Total across all watched domains, `per_domain` breakdown in the attributes |
 | `sensor.entity_watchguard_last_recovery_attempt` | timestamp | Diagnostic |
@@ -56,6 +56,8 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 | `button.entity_watchguard_recover_now` | button | Run stage 1 for everything currently unavailable, ignoring the delays |
 
 During the startup grace period every sensor stays `off` and reports `status: warming_up`.
+
+The entity lists are capped at 50 entries (`truncated: true` tells you there were more; `count` always stays exact) and are excluded from the recorder, so a large outage doesn't write the same long list into the database on every scan.
 
 ## Services
 
