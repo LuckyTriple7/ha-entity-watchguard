@@ -4,6 +4,7 @@ from __future__ import annotations
 from pytest_homeassistant_custom_component.common import async_mock_service
 
 from custom_components.entity_watchguard.const import (
+    CONF_GRACE_PERIOD,
     CONF_STAGE1_ENABLED,
     CONF_STARTUP_DELAY,
 )
@@ -36,6 +37,22 @@ async def test_check_now_ends_startup_grace_period(hass, setup_watchguard):
 
     assert coordinator.warming_up is False
     assert coordinator.data["total"] == 1
+
+
+async def test_check_now_skips_the_grace_period_once(hass, setup_watchguard):
+    hass.states.async_set("light.kitchen", "unavailable")
+    _, coordinator = await setup_watchguard(
+        **{CONF_STARTUP_DELAY: 300, CONF_GRACE_PERIOD: 120}
+    )
+
+    await _press(hass, "button.entity_watchguard_check_now")
+    assert coordinator.data["total"] == 1
+
+    # Only for that one run — the next entity still has to sit out the grace
+    # period.
+    hass.states.async_set("switch.pump", "unavailable")
+    await coordinator.async_refresh()
+    assert coordinator.data["domains"]["switch"].count == 0
 
 
 async def test_recover_now_button(hass, setup_watchguard):

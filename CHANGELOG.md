@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-08-15
+### Fixed
+- **Check now** reported nothing even when entities were unavailable: it ended the startup grace period, but the freshly tracked entities then still had to sit out the per-entity grace period (default 120 s), so the sensors stayed at 0. The button now skips both grace periods for that one run — the next scan goes back to the configured grace period
+
 ## [0.4.0] - 2026-08-15
 ### Added
 - Stage 2 can now repeat (default: every 60 min) instead of running once per outage, and gives up after a configurable number of attempts (default 3, `0` = never). Given-up entities stay reported and appear in the new `given_up_entities` attribute — they just stop triggering reloads

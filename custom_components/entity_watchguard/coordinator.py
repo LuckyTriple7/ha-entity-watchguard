@@ -145,6 +145,8 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._notifications: dict[str, str] = {}
         self._issues: set[str] = set()
         self._pushed: set[str] = set()
+        # Set by the Check now button; consumed by the next _build_data().
+        self._skip_grace_once = False
         # None until HA has finished starting; see async_setup_activation().
         self._active_at: datetime | None = None
         # Resolving labels/devices/areas walks the whole entity registry, which
@@ -197,14 +199,19 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             self.entry.async_on_unload(self.hass.bus.async_listen(event_type, _invalidate))
 
     async def async_check_now(self) -> None:
-        """Scan right now — pressing the button also ends the startup grace
-        period early, since asking for a check while the integration is still
-        warming up would otherwise return nothing."""
+        """Scan right now and report what it finds.
+
+        Both grace periods are skipped for this one run: the startup one, and
+        the per-entity one — otherwise the button would find the entities but
+        still report zero for another `grace_period` seconds, which reads like
+        a broken integration.
+        """
         if self.warming_up:
             _LOGGER.info("Manual check requested — ending the startup grace period early")
             self._active_at = dt_util.utcnow()
         else:
             _LOGGER.debug("Manual check requested")
+        self._skip_grace_once = True
         await self.async_refresh()
 
     async def async_shutdown(self) -> None:
@@ -256,7 +263,11 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.info("Available again (%d): %s", len(gone), ", ".join(sorted(gone)))
 
     def _build_data(self, now: datetime) -> dict:
-        grace = timedelta(seconds=self.options[CONF_GRACE_PERIOD])
+        if self._skip_grace_once:
+            self._skip_grace_once = False
+            grace = timedelta(0)
+        else:
+            grace = timedelta(seconds=self.options[CONF_GRACE_PERIOD])
         domains: dict[str, DomainReport] = {domain: DomainReport() for domain in self.monitored_domains}
 
         for entity_id, tracked in sorted(self._tracked.items()):
