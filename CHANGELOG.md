@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-08-15
+### Added
+- Stage 2 now only reloads a config entry when a large enough share of **its** entities is unavailable (new option, default 50 %, `0` disables the check). Hub integrations have a single config entry for hundreds of entities, so one dead MQTT sensor would otherwise restart the whole broker — taking every other MQTT entity down with it, without fixing a device that is simply offline. If the rest of the hub dies later, the next retry round reloads after all
+
 ## [0.5.0] - 2026-08-15
 ### Added
 - Exceptions **per integration** — exclude everything provided by e.g. `shelly`, `mqtt` or `hue` in one go, instead of picking devices one by one

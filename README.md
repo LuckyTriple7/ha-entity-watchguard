@@ -25,7 +25,8 @@ Every check interval the integration walks the states of the watched domains, ke
 unavailable detected
    ├─ grace period ......... short flapping is ignored
    ├─ stage 1 .............. homeassistant.update_entity (skipped for push integrations)
-   ├─ stage 2 .............. reload the entity's config entry, repeated on the retry interval
+   ├─ stage 2 .............. reload the entity's config entry — only if enough
+   │                         of that entry is down, repeated on the retry interval
    ├─ notify delay ......... notification / repair issue / notify service
    └─ give up .............. stop trying, keep reporting
 ```
@@ -51,6 +52,7 @@ The record is dropped the moment the entity is available again, so every timer s
 | Timings | Grace period | 120 s | An entity must stay unavailable this long before it is reported |
 | Recovery | Stage 1 (update entity) | on, after 300 s | `homeassistant.update_entity` — gentle. Automatically skipped for push integrations (`iot_class: *_push`), where it would be a no-op |
 | Recovery | Stage 2 (reload config entry) | off, after 900 s | More effective, but all entities of that integration disappear briefly |
+| Recovery | Reload only above | 50 % | Share of the config entry's entities that must be unavailable. Hub integrations (MQTT, ZHA, Z-Wave) have **one** config entry for hundreds of entities — without this, a single dead sensor would restart the whole broker. `0` disables the check |
 | Recovery | Reload cooldown | 3600 s | Minimum distance between two reloads of the same config entry |
 | Recovery | Max reloads per check | 3 | Guards against a reload storm |
 | Recovery | Repeat stage 2 every | 3600 s | `0` = try stage 2 only once per outage |

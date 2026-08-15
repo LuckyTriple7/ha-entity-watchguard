@@ -23,6 +23,7 @@ from custom_components.entity_watchguard.const import (
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
     CONF_STAGE2_ENABLED,
+    CONF_STAGE2_MIN_AFFECTED,
     CONF_STARTUP_DELAY,
 )
 
@@ -268,6 +269,64 @@ async def test_stage1_skipped_for_push_integrations(hass, setup_watchguard, upda
     # Marked as done so it isn't re-evaluated every cycle, but no attempt spent.
     assert coordinator.tracked["light.pump"].stage1_at is not None
     assert coordinator.tracked["light.pump"].attempts == 0
+
+
+async def test_stage2_skips_hub_entry_with_few_affected_entities(hass, setup_watchguard):
+    """One dead MQTT sensor must not restart the whole broker."""
+    broker = MockConfigEntry(domain="mqtt")
+    broker.add_to_hass(hass)
+    broker.mock_state(hass, ConfigEntryState.LOADED)
+    registry = er.async_get(hass)
+    healthy = []
+    for index in range(10):
+        entry = registry.async_get_or_create(
+            "light", "mqtt", f"lamp{index}", config_entry=broker
+        )
+        hass.states.async_set(entry.entity_id, "on")
+        healthy.append(entry.entity_id)
+    dead = _register_entity(hass, broker, "light", "dead_sensor")
+
+    _, coordinator = await setup_watchguard(
+        **{CONF_STAGE2_ENABLED: True, CONF_STAGE2_DELAY: 900, CONF_STAGE2_MIN_AFFECTED: 50}
+    )
+    backdate(coordinator, 1000)
+
+    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as reload:
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    reload.assert_not_awaited()
+    assert coordinator.data["domains"]["light"].entity_ids == [dead]
+
+    # Broker dies completely -> the same entity does get a reload after all.
+    for entity_id in healthy:
+        hass.states.async_set(entity_id, "unavailable")
+    await coordinator.async_refresh()
+    backdate(coordinator, 4000)
+    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as reload:
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    reload.assert_awaited_once_with(broker.entry_id)
+
+
+async def test_stage2_reloads_hub_entry_when_everything_is_down(hass, setup_watchguard):
+    broker = MockConfigEntry(domain="mqtt")
+    broker.add_to_hass(hass)
+    broker.mock_state(hass, ConfigEntryState.LOADED)
+    for index in range(5):
+        _register_entity(hass, broker, "light", f"lamp{index}")
+
+    _, coordinator = await setup_watchguard(
+        **{CONF_STAGE2_ENABLED: True, CONF_STAGE2_DELAY: 900, CONF_STAGE2_MIN_AFFECTED: 50}
+    )
+    backdate(coordinator, 1000)
+
+    with patch.object(hass.config_entries, "async_reload", new_callable=AsyncMock) as reload:
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    reload.assert_awaited_once_with(broker.entry_id)
 
 
 async def test_stage2_retries_then_gives_up(hass, setup_watchguard):

@@ -45,7 +45,7 @@
       },
       "recovery": {
         "title": "Recovery",
-        "description": "Stage 1 asks Home Assistant to poll the entity again. Stage 2 reloads the config entry the entity belongs to — more effective, but all entities of that integration disappear briefly.",
+        "description": "Stage 1 asks Home Assistant to poll the entity again. Stage 2 reloads the config entry the entity belongs to — more effective, but all entities of that integration disappear briefly. Hub integrations (MQTT, ZHA, Z-Wave) have one config entry for hundreds of entities, which is why stage 2 only reloads when enough of them are affected.",
         "data": {
           "recover_stage1_enabled": "Stage 1: update entity",
           "recover_stage1_delay": "Stage 1 after",
@@ -53,6 +53,7 @@
           "recover_stage2_delay": "Stage 2 after",
           "reload_cooldown": "Minimum time between reloads of the same config entry",
           "max_reloads_per_cycle": "Maximum reloads per check",
+          "stage2_min_affected": "Reload only when this share of the config entry is unavailable (0 = always)",
           "retry_interval": "Repeat stage 2 every (0 = only once)",
           "max_recovery_attempts": "Give up after this many stage 2 attempts (0 = never give up)"
         }

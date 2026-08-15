@@ -35,6 +35,7 @@ from .const import (
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
     CONF_STAGE2_ENABLED,
+    CONF_STAGE2_MIN_AFFECTED,
     CONF_STARTUP_DELAY,
     DOMAIN,
     NOTIFICATION_ID_PREFIX,
@@ -424,6 +425,17 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                         tracked.stage2_at = now
                 continue
 
+            if not self._async_entry_is_broken_enough(ent_reg, config_entry_id, target):
+                # Hub-style entries (MQTT, ZHA, Z-Wave) own hundreds of
+                # entities. Reloading the whole broker over one dead sensor
+                # takes every other entity down with it and doesn't fix a
+                # device that is simply offline. Not given_up: if the rest of
+                # the hub dies later, the next retry round reloads after all.
+                for entity_id in affected:
+                    if (tracked := self._tracked.get(entity_id)) is not None:
+                        tracked.stage2_at = now
+                continue
+
             _LOGGER.info(
                 "Stage 2: stage 1 did not bring back %s — reloading config entry %s (%s)",
                 affected,
@@ -444,6 +456,43 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                 self._async_reload(config_entry_id, target.title),
                 f"{DOMAIN}_reload_{config_entry_id}",
             )
+
+    def _async_entry_is_broken_enough(
+        self, ent_reg: er.EntityRegistry, config_entry_id: str, target: ConfigEntry
+    ) -> bool:
+        """Is a large enough share of this config entry's entities down?
+
+        A reload fixes an integration that lost its connection, not a single
+        device that is switched off — and for hub-style entries the two look
+        identical from the outside except for this ratio.
+        """
+        threshold = self.options[CONF_STAGE2_MIN_AFFECTED]
+        if not threshold:
+            return True
+
+        owned = [
+            registry_entry.entity_id
+            for registry_entry in er.async_entries_for_config_entry(ent_reg, config_entry_id)
+            if not registry_entry.disabled_by
+        ]
+        if not owned:
+            return True
+
+        down = sum(1 for entity_id in owned if entity_id in self._tracked)
+        ratio = down * 100 / len(owned)
+        if ratio >= threshold:
+            return True
+
+        _LOGGER.info(
+            "Stage 2: not reloading %s (%s) — only %d of %d entities affected (%.0f%% < %d%%)",
+            target.title,
+            target.domain,
+            down,
+            len(owned),
+            ratio,
+            threshold,
+        )
+        return False
 
     def _async_check_give_up(self, entity_id: str, tracked: Tracked) -> None:
         """Stop trying after the configured number of stage 2 rounds."""

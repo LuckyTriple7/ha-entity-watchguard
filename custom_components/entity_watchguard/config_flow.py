@@ -49,6 +49,7 @@ from .const import (
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
     CONF_STAGE2_ENABLED,
+    CONF_STAGE2_MIN_AFFECTED,
     CONF_STARTUP_DELAY,
     DEFAULT_MONITORED_DOMAINS,
     DOMAIN,
@@ -215,6 +216,14 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
                     CONF_MAX_RELOADS_PER_CYCLE, default=current[CONF_MAX_RELOADS_PER_CYCLE]
                 ): NumberSelector(
                     NumberSelectorConfig(min=1, max=20, step=1, mode=NumberSelectorMode.BOX)
+                ),
+                vol.Required(
+                    CONF_STAGE2_MIN_AFFECTED, default=current[CONF_STAGE2_MIN_AFFECTED]
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0, max=100, step=5, mode=NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
                 ),
                 vol.Required(
                     CONF_RETRY_INTERVAL, default=current[CONF_RETRY_INTERVAL]

@@ -45,7 +45,7 @@
       },
       "recovery": {
         "title": "Wiederherstellung",
-        "description": "Stufe 1 fordert Home Assistant auf, die Entity erneut abzufragen. Stufe 2 lädt den Config-Entry der zugehörigen Integration neu – wirksamer, aber alle Entities dieser Integration sind kurz weg.",
+        "description": "Stufe 1 fordert Home Assistant auf, die Entity erneut abzufragen. Stufe 2 lädt den Config-Entry der zugehörigen Integration neu – wirksamer, aber alle Entities dieser Integration sind kurz weg. Hub-Integrationen (MQTT, ZHA, Z-Wave) haben einen Config-Entry für hunderte Entities; deshalb lädt Stufe 2 nur neu, wenn genug davon betroffen sind.",
         "data": {
           "recover_stage1_enabled": "Stufe 1: Entity aktualisieren",
           "recover_stage1_delay": "Stufe 1 nach",
@@ -53,6 +53,7 @@
           "recover_stage2_delay": "Stufe 2 nach",
           "reload_cooldown": "Mindestabstand zwischen zwei Reloads desselben Config-Entry",
           "max_reloads_per_cycle": "Maximale Reloads pro Prüflauf",
+          "stage2_min_affected": "Nur neu laden, wenn dieser Anteil des Config-Entry nicht verfügbar ist (0 = immer)",
           "retry_interval": "Stufe 2 wiederholen alle (0 = nur einmal)",
           "max_recovery_attempts": "Aufgeben nach so vielen Stufe-2-Versuchen (0 = nie aufgeben)"
         }
