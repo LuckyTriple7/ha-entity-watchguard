@@ -1,0 +1,19 @@
+name: Card
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    name: Card smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check
+        run: node --check custom_components/entity_watchguard/www/entity-watchguard-card.js
+      - name: Render card against DOM stubs
+        run: node tests/card/smoke.js

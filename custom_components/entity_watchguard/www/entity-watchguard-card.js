@@ -10,9 +10,8 @@
 // (entity_watchguard) is not a valid custom element name.
 const CARD_TAG = "entity-watchguard-card";
 
-const DE = (navigator.language || "en").toLowerCase().startsWith("de");
-const T = DE
-  ? {
+const STRINGS = {
+  de: {
       title: "Entity Watchguard",
       offline: "nicht verfügbar",
       allOk: "Alles verfügbar",
@@ -29,8 +28,8 @@ const T = DE
       failed: "Fehlgeschlagen",
       noSensors: "Keine Entity-Watchguard-Sensoren gefunden.",
       more: (n) => `… und ${n} weitere`,
-    }
-  : {
+    },
+  en: {
       title: "Entity Watchguard",
       offline: "unavailable",
       allOk: "All available",
@@ -47,7 +46,27 @@ const T = DE
       failed: "Failed",
       noSensors: "No Entity Watchguard sensors found.",
       more: (n) => `… and ${n} more`,
-    };
+  },
+};
+
+/** An explicit `language:` in the card config wins; otherwise the user's Home
+ *  Assistant language, with the browser as the last fallback (and the only
+ *  thing available before `hass` is set). */
+function isGerman(hass, config) {
+  const forced = (config?.language || "auto").toLowerCase();
+  if (forced === "de" || forced === "en") return forced === "de";
+  const lang = (
+    hass?.locale?.language ||
+    hass?.language ||
+    navigator.language ||
+    "en"
+  ).toLowerCase();
+  return lang.startsWith("de");
+}
+
+function strings(hass, config) {
+  return isGerman(hass, config) ? STRINGS.de : STRINGS.en;
+}
 
 const DOMAIN_ICONS = {
   light: "mdi:lightbulb",
@@ -76,10 +95,10 @@ function relativeAge(iso) {
   return `${Math.floor(hours / 24)} d ${hours % 24} h`;
 }
 
-function timeOfDay(iso) {
+function timeOfDay(iso, german) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString(DE ? "de-DE" : "en-GB", {
+  return date.toLocaleTimeString(german ? "de-DE" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -102,9 +121,12 @@ class EntityWatchguardCard extends HTMLElement {
     this._config = {};
   }
 
+  get _t() {
+    return strings(this._hass, this._config);
+  }
+
   setConfig(config) {
     this._config = {
-      title: T.title,
       show_ok_domains: true,
       show_buttons: true,
       allow_ignore: true,
@@ -156,7 +178,7 @@ class EntityWatchguardCard extends HTMLElement {
   async _press(suffix, element) {
     const entityId = this._button(suffix);
     if (!entityId) {
-      this._banner(`${T.failed}: button.…_${suffix}`);
+      this._banner(`${this._t.failed}: button.…_${suffix}`);
       return;
     }
     const label = element.textContent;
@@ -164,9 +186,9 @@ class EntityWatchguardCard extends HTMLElement {
     element.textContent = "…";
     try {
       await this._hass.callService("button", "press", { entity_id: entityId });
-      this._banner(suffix === "check_now" ? T.checked : T.recovering);
+      this._banner(suffix === "check_now" ? this._t.checked : this._t.recovering);
     } catch (err) {
-      this._banner(`${T.failed}: ${err.message || err}`);
+      this._banner(`${this._t.failed}: ${err.message || err}`);
     } finally {
       element.disabled = false;
       element.textContent = label;
@@ -217,11 +239,11 @@ class EntityWatchguardCard extends HTMLElement {
         entity_id: entityId,
         labels: [...next],
       });
-      this._note(entityId, T.ignored);
+      this._note(entityId, this._t.ignored);
     } catch (err) {
       // Most likely a YAML entity (not in the registry) or missing admin
       // rights — say so on the row instead of failing silently.
-      this._note(entityId, `${T.failed}: ${err.message || err}`);
+      this._note(entityId, `${this._t.failed}: ${err.message || err}`);
     }
   }
 
@@ -243,6 +265,8 @@ class EntityWatchguardCard extends HTMLElement {
   // --- rendering -----------------------------------------------------
   _render() {
     if (!this._hass) return;
+    const T = this._t;
+    const german = isGerman(this._hass, this._config);
     const sensors = this._sensors();
     const total = sensors.reduce((sum, sensor) => sum + sensor.count, 0);
     const warming = sensors.some((sensor) => sensor.status === "warming_up");
@@ -259,7 +283,7 @@ class EntityWatchguardCard extends HTMLElement {
       <div class="header">
         <ha-icon icon="${total ? "mdi:shield-alert" : "mdi:shield-check"}"
                  class="${total ? "bad" : "good"}"></ha-icon>
-        <div class="title">${this._config.title}</div>
+        <div class="title">${this._config.title ?? T.title}</div>
         <div class="summary ${total ? "bad" : "good"}">
           ${warming ? T.warming : total ? `${total} ${T.offline}` : T.allOk}
         </div>
@@ -295,7 +319,7 @@ class EntityWatchguardCard extends HTMLElement {
                 ${item.given_up ? `<span class="tag">${T.gaveUp}</span>` : ""}
               </div>
               <div class="meta">
-                ${item.entity_id} · ${T.since} ${timeOfDay(item.since)}
+                ${item.entity_id} · ${T.since} ${timeOfDay(item.since, german)}
                 (${relativeAge(item.since)})
                 ${item.attempts ? ` · ${item.attempts} ${T.attempts}` : ""}
               </div>
@@ -435,6 +459,8 @@ class EntityWatchguardCardEditor extends HTMLElement {
   _render() {
     if (!this._config) return;
     const conf = this._config;
+    const T = strings(this._hass, this._config);
+    const DE = isGerman(this._hass, this._config);
     // Native inputs, same reasoning as the card itself: no dependency on
     // frontend-internal elements that may not be registered.
     const check = (key, label) => `
@@ -448,7 +474,7 @@ class EntityWatchguardCardEditor extends HTMLElement {
         .ewg-form { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
         .ewg-field { display: flex; flex-direction: column; gap: 4px; }
         .ewg-field span { font-size: .8rem; color: var(--secondary-text-color); }
-        .ewg-field input {
+        .ewg-field input, .ewg-field select {
           font: inherit; padding: 8px; border-radius: 4px;
           border: 1px solid var(--divider-color);
           background: var(--card-background-color); color: var(--primary-text-color);
@@ -464,6 +490,16 @@ class EntityWatchguardCardEditor extends HTMLElement {
           <span>${DE ? "Label zum Ignorieren" : "Label used for ignoring"}</span>
           <input type="text" id="ignore_label" value="${conf.ignore_label ?? "offline"}">
         </label>
+        <label class="ewg-field">
+          <span>${DE ? "Sprache" : "Language"}</span>
+          <select id="language">
+            <option value="auto" ${(conf.language ?? "auto") === "auto" ? "selected" : ""}>
+              ${DE ? "Automatisch (Home Assistant)" : "Automatic (Home Assistant)"}
+            </option>
+            <option value="de" ${conf.language === "de" ? "selected" : ""}>Deutsch</option>
+            <option value="en" ${conf.language === "en" ? "selected" : ""}>English</option>
+          </select>
+        </label>
         ${check("show_ok_domains", DE ? "Saubere Domains anzeigen" : "Show clean domains")}
         ${check("show_buttons", DE ? "Buttons anzeigen" : "Show buttons")}
         ${check("allow_ignore", DE ? "Ignorieren erlauben" : "Allow ignoring")}
@@ -475,6 +511,12 @@ class EntityWatchguardCardEditor extends HTMLElement {
     this.querySelectorAll('input[type="checkbox"]').forEach((toggle) =>
       toggle.addEventListener("change", () => this._emit({ [toggle.id]: toggle.checked }))
     );
+    this.querySelectorAll("select").forEach((select) =>
+      select.addEventListener("change", () => {
+        this._emit({ [select.id]: select.value });
+        this._render(); // the editor's own labels follow the choice
+      })
+    );
   }
 }
 
@@ -485,7 +527,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: CARD_TAG,
   name: "Entity Watchguard",
-  description: DE
+  description: isGerman(null, null)
     ? "Nicht verfügbare Entities pro Domain, mit Wiederherstellungs-Buttons"
     : "Unavailable entities per domain, with recovery buttons",
   preview: true,

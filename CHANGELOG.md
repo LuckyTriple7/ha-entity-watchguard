@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2026-08-15
+### Changed
+- The card follows the **user's Home Assistant language** instead of the browser's, and can be pinned with `language: de` / `language: en` (visual editor has a picker; default `auto`)
+
+### Added
+- `tests/card/smoke.js` — renders the card against DOM stubs and asserts on the produced HTML, plus a Card workflow that runs it on every push. The two card bugs in 0.7.1/0.7.2 would both have been caught by it
+
 ## [0.7.2] - 2026-08-15
 ### Fixed
 - The card's buttons rendered as plain text ("Jetzt prüfen Wiederherstellen") and the per-entity label button escaped the card's bounds: both used frontend-internal elements (`mwc-button`, `ha-icon-button`) that aren't reliably registered for custom cards. They are plain styled `<button>`s now, as are the editor's inputs

@@ -45,12 +45,14 @@ show_ok_domains: true         # also list domains with nothing wrong
 show_buttons: true            # Check now / Recover now
 allow_ignore: true            # per-entity "ignore" action
 ignore_label: offline         # label applied by that action
+language: auto                # auto | de | en
 ```
 
 - One row per watched domain with a counter; click to expand the affected entities
 - Each entity shows since when it's been gone, how many recovery attempts ran, and whether Watchguard gave up
 - Click an entity for its more-info dialog
 - The label button applies your ignore label to that entity — it's excluded from the next scan on, provided that label is listed under Configure → Exceptions. The label is created on first use
+- German and English; follows the user's Home Assistant language, or set `language: de` / `en` explicitly
 - Has a visual editor
 
 > After a HACS update, do a full **restart** (not just a reload) and hard-refresh the browser — the card is served with a version-stamped URL, but the frontend caches aggressively.
