@@ -14,6 +14,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import label_registry as lr
+from homeassistant.loader import Integration, async_get_integrations
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -147,6 +148,8 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._pushed: set[str] = set()
         # Set by the Check now button; consumed by the next _build_data().
         self._skip_grace_once = False
+        # platform -> iot_class from its manifest (None = could not resolve)
+        self._iot_classes: dict[str, str | None] = {}
         # None until HA has finished starting; see async_setup_activation().
         self._active_at: datetime | None = None
         # Resolving labels/devices/areas walks the whole entity registry, which
@@ -301,7 +304,17 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                 and now - tracked.first_unavailable >= delay
             ]
             if due:
-                await self.async_stage1(due, now)
+                pollable, push = await self._async_split_by_iot_class(due)
+                if push:
+                    # update_entity is a no-op for push integrations (MQTT, ZHA,
+                    # ESPHome …) — skip straight to stage 2 rather than burning
+                    # an "attempt" on a call that cannot do anything.
+                    _LOGGER.debug("Stage 1 skipped for push entities: %s", sorted(push))
+                    for entity_id in push:
+                        if (tracked := self._tracked.get(entity_id)) is not None:
+                            tracked.stage1_at = now
+                if pollable:
+                    await self.async_stage1(pollable, now)
 
         if self.options[CONF_STAGE2_ENABLED]:
             delay = timedelta(seconds=self.options[CONF_STAGE2_DELAY])
@@ -320,6 +333,40 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             ]
             if due:
                 await self.async_stage2(due, now)
+
+    async def _async_split_by_iot_class(
+        self, entity_ids: list[str]
+    ) -> tuple[list[str], list[str]]:
+        """Split into (pollable, push) using each integration's iot_class.
+
+        Anything we can't resolve counts as pollable — stage 1 is cheap, and a
+        wrong guess in that direction only costs one service call.
+        """
+        ent_reg = er.async_get(self.hass)
+        by_platform: dict[str, list[str]] = {}
+        unknown: list[str] = []
+        for entity_id in entity_ids:
+            registry_entry = ent_reg.async_get(entity_id)
+            if registry_entry is None:
+                unknown.append(entity_id)
+            else:
+                by_platform.setdefault(registry_entry.platform, []).append(entity_id)
+
+        missing = [platform for platform in by_platform if platform not in self._iot_classes]
+        if missing:
+            integrations = await async_get_integrations(self.hass, missing)
+            for platform, result in integrations.items():
+                self._iot_classes[platform] = (
+                    result.iot_class if isinstance(result, Integration) else None
+                )
+
+        pollable, push = list(unknown), []
+        for platform, members in by_platform.items():
+            if (self._iot_classes.get(platform) or "").endswith("_push"):
+                push += members
+            else:
+                pollable += members
+        return pollable, push
 
     async def async_stage1(self, entity_ids: list[str], now: datetime | None = None) -> None:
         """Stage 1: ask HA to poll the entities again."""

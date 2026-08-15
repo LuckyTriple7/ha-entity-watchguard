@@ -11,6 +11,7 @@ from custom_components.entity_watchguard.const import (
     CONF_EXCLUDE_AREAS,
     CONF_EXCLUDE_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_INTEGRATIONS,
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
 )
@@ -23,6 +24,7 @@ def _options(**overrides) -> dict:
         CONF_EXCLUDE_ENTITIES: [],
         CONF_EXCLUDE_DEVICES: [],
         CONF_EXCLUDE_AREAS: [],
+        CONF_EXCLUDE_INTEGRATIONS: [],
         CONF_EXCLUDE_PATTERNS: [],
         **overrides,
     }
@@ -106,6 +108,16 @@ async def test_area_label_excludes_entities_in_area(hass):
 
     exclusion = build_exclusion(hass, _options(exclude_labels=["offline"]))
     assert exclusion.excludes(entry.entity_id)
+
+
+async def test_integration_excluded(hass):
+    ent_reg = er.async_get(hass)
+    shelly = ent_reg.async_get_or_create("light", "shelly", "1", suggested_object_id="relay")
+    hue = ent_reg.async_get_or_create("light", "hue", "1", suggested_object_id="lamp")
+
+    exclusion = build_exclusion(hass, _options(exclude_integrations=["shelly"]))
+    assert exclusion.excludes(shelly.entity_id)
+    assert not exclusion.excludes(hue.entity_id)
 
 
 async def test_invalid_pattern_is_ignored(hass):

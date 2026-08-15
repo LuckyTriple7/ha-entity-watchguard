@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     AreaSelector,
     AreaSelectorConfig,
@@ -31,6 +32,7 @@ from .const import (
     CONF_EXCLUDE_AREAS,
     CONF_EXCLUDE_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_INTEGRATIONS,
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
     CONF_GRACE_PERIOD,
@@ -70,6 +72,18 @@ def _domain_selector(hass: HomeAssistant, selected: list[str]) -> SelectSelector
     options = sorted(available | set(SUGGESTED_DOMAINS) | set(selected))
     return SelectSelector(
         SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN)
+    )
+
+
+@callback
+def _integration_selector(hass: HomeAssistant, selected: list[str]) -> SelectSelector:
+    """Integrations that actually provide entities here (registry `platform`)."""
+    available = {entry.platform for entry in er.async_get(hass).entities.values()}
+    options = sorted(available | set(selected))
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=options, multiple=True, custom_value=True, mode=SelectSelectorMode.DROPDOWN
+        )
     )
 
 
@@ -240,6 +254,10 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_EXCLUDE_AREAS, default=list(current[CONF_EXCLUDE_AREAS])
                 ): AreaSelector(AreaSelectorConfig(multiple=True)),
+                vol.Optional(
+                    CONF_EXCLUDE_INTEGRATIONS,
+                    default=list(current[CONF_EXCLUDE_INTEGRATIONS]),
+                ): _integration_selector(self.hass, list(current[CONF_EXCLUDE_INTEGRATIONS])),
                 vol.Optional(
                     CONF_EXCLUDE_PATTERNS, default=list(current[CONF_EXCLUDE_PATTERNS])
                 ): SelectSelector(

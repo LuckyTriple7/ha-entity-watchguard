@@ -9,11 +9,28 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 
 - One `problem` binary sensor per watched domain (`light`, `switch`, `sensor`, `binary_sensor`, …), listing the affected entities in its attributes, plus one overall problem sensor
 - Pick the watched domains in the UI — the picker offers every domain that exists in your instance
-- Exceptions by **label**, **entity**, **device**, **area** and **regex pattern** on the entity ID
-- Escalating recovery: stage 1 re-polls the entity (`homeassistant.update_entity`), stage 2 reloads the config entry the entity belongs to — each stage separately switchable, with its own delay
+- Exceptions by **label**, **entity**, **device**, **area**, **integration** and **regex pattern** on the entity ID
+- Escalating recovery: stage 1 re-polls the entity (`homeassistant.update_entity`), stage 2 reloads the config entry the entity belongs to. Stage 2 repeats on a slow interval and gives up after a configurable number of attempts
+- Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …), where re-polling cannot achieve anything
 - Startup grace period: after a Home Assistant restart the integration stays quiet for a configurable time, because entities need a few minutes to come up
-- One persistent notification per domain — it updates itself instead of piling up, and is dismissed automatically once the domain is clean again
-- Light on CPU: one in-memory scan per interval (default 60 s), no template rendering and no state-change listeners
+- Three reporting channels, each switchable: **persistent notifications** (one per domain, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
+- **Check now** / **Recover now** buttons for everything you don't want to wait for
+- Light on CPU: one in-memory scan per interval (default 60 s), no template rendering and no state-change listeners. Long entity lists are kept out of the recorder
+
+## How it works
+
+Every check interval the integration walks the states of the watched domains, keeping the ones that are `unavailable` and not excluded. Each such entity gets an "outage" record with the time it started. From there:
+
+```
+unavailable detected
+   ├─ grace period ......... short flapping is ignored
+   ├─ stage 1 .............. homeassistant.update_entity (skipped for push integrations)
+   ├─ stage 2 .............. reload the entity's config entry, repeated on the retry interval
+   ├─ notify delay ......... notification / repair issue / notify service
+   └─ give up .............. stop trying, keep reporting
+```
+
+The record is dropped the moment the entity is available again, so every timer starts fresh on the next outage.
 
 ## Installation via HACS
 
@@ -32,7 +49,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 | Timings | Startup delay | 300 s | Counted from the moment HA has finished starting |
 | Timings | Check interval | 60 s | How often the states are scanned |
 | Timings | Grace period | 120 s | An entity must stay unavailable this long before it is reported |
-| Recovery | Stage 1 (update entity) | on, after 300 s | `homeassistant.update_entity` — gentle, only helps polling integrations |
+| Recovery | Stage 1 (update entity) | on, after 300 s | `homeassistant.update_entity` — gentle. Automatically skipped for push integrations (`iot_class: *_push`), where it would be a no-op |
 | Recovery | Stage 2 (reload config entry) | off, after 900 s | More effective, but all entities of that integration disappear briefly |
 | Recovery | Reload cooldown | 3600 s | Minimum distance between two reloads of the same config entry |
 | Recovery | Max reloads per check | 3 | Guards against a reload storm |
@@ -40,6 +57,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 | Recovery | Give up after | 3 attempts | `0` = never give up. A device that is simply switched off is not worth reloading forever; it stays reported, just without further attempts |
 | Exceptions | Labels | – | Set on an entity, device or area; e.g. an `offline` label for devices you knowingly powered down |
 | Exceptions | Entities / Devices / Areas | – | Explicit pickers |
+| Exceptions | Integrations | – | Everything provided by that integration, e.g. `shelly`, `mqtt`, `hue` — useful for a whole system you knowingly leave offline |
 | Exceptions | Patterns | – | Regex against the entity ID, e.g. `.*_internet_access$` |
 | Notifications | Persistent notifications | on | One per domain, self-updating, auto-dismissed. Entities of the same device are collapsed into one line |
 | Notifications | Repair issues | on | Mirrors the same outages into Settings → Repairs, where they can be ignored per domain |
@@ -87,6 +105,8 @@ logger:
 
 ## Notes
 
-- Entities that are not in the entity registry (YAML/template entities) can only be exempted via **patterns** or the **entity** picker; label/device/area exemptions need a registry entry.
+- Entities that are not in the entity registry (YAML/template entities) can only be exempted via **patterns** or the **entity** picker; label/device/area/integration exemptions need a registry entry.
 - Stage 2 never reloads Entity Watchguard's own config entry, skips entries that are not loaded, and honours the cooldown.
+- Push detection reads `iot_class` from the integration's manifest. Anything that can't be resolved is treated as pollable — one harmless service call is cheaper than a missed recovery.
+- **Nothing showing up?** Check the `status` attribute of a domain sensor: `warming_up` means the startup delay is still running (press **Check now** to end it), `ok` with `count: 0` means nothing matched — verify the domain is actually watched and that the entities are `unavailable`, not `unknown`.
 - Replacing template sensors: `label_entities('offline')` maps to the label exceptions, `rejectattr('entity_id', 'match', '.*_internet_access$')` maps to the pattern exceptions.

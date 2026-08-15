@@ -20,6 +20,7 @@ from .const import (
     CONF_EXCLUDE_AREAS,
     CONF_EXCLUDE_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_INTEGRATIONS,
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
 )
@@ -69,6 +70,7 @@ def build_exclusion(hass: HomeAssistant, options: dict) -> Exclusion:
     labels: set[str] = set(options.get(CONF_EXCLUDE_LABELS) or [])
     devices: set[str] = set(options.get(CONF_EXCLUDE_DEVICES) or [])
     areas: set[str] = set(options.get(CONF_EXCLUDE_AREAS) or [])
+    integrations: set[str] = set(options.get(CONF_EXCLUDE_INTEGRATIONS) or [])
 
     ent_reg = er.async_get(hass)
     dev_reg = dr.async_get(hass)
@@ -79,9 +81,14 @@ def build_exclusion(hass: HomeAssistant, options: dict) -> Exclusion:
         areas |= {area.id for area in area_reg.async_list_areas() if labels & set(area.labels)}
         devices |= {device.id for device in dev_reg.devices.values() if labels & set(device.labels)}
 
-    if labels or devices or areas:
+    if labels or devices or areas or integrations:
         for entry in ent_reg.entities.values():
             if entry.entity_id in excluded:
+                continue
+            # entry.platform is the integration that provides the entity
+            # ("shelly", "mqtt", "hue"), not the entity domain.
+            if entry.platform in integrations:
+                excluded.add(entry.entity_id)
                 continue
             if labels & set(entry.labels):
                 excluded.add(entry.entity_id)

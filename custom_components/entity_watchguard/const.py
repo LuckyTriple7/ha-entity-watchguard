@@ -28,6 +28,7 @@ CONF_EXCLUDE_ENTITIES = "exclude_entities"
 CONF_EXCLUDE_PATTERNS = "exclude_patterns"
 CONF_EXCLUDE_DEVICES = "exclude_devices"
 CONF_EXCLUDE_AREAS = "exclude_areas"
+CONF_EXCLUDE_INTEGRATIONS = "exclude_integrations"
 
 # --- defaults -----------------------------------------------------------
 DEFAULT_MONITORED_DOMAINS = [
@@ -117,6 +118,7 @@ DEFAULTS: dict[str, object] = {
     CONF_EXCLUDE_PATTERNS: [],
     CONF_EXCLUDE_DEVICES: [],
     CONF_EXCLUDE_AREAS: [],
+    CONF_EXCLUDE_INTEGRATIONS: [],
 }
 
 

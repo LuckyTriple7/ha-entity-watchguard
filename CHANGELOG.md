@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-08-15
+### Added
+- Exceptions **per integration** — exclude everything provided by e.g. `shelly`, `mqtt` or `hue` in one go, instead of picking devices one by one
+- Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …). `homeassistant.update_entity` can't do anything for them, so recovery goes straight to stage 2 instead of burning an attempt. Detected via the integration's `iot_class`; anything unresolvable is still treated as pollable
+
+### Changed
+- README rewritten for the current feature set, including a flow diagram of an outage and a short troubleshooting section
+
 ## [0.4.1] - 2026-08-15
 ### Fixed
 - **Check now** reported nothing even when entities were unavailable: it ended the startup grace period, but the freshly tracked entities then still had to sit out the per-entity grace period (default 120 s), so the sensors stayed at 0. The button now skips both grace periods for that one run — the next scan goes back to the configured grace period

@@ -59,12 +59,13 @@
       },
       "exceptions": {
         "title": "Ausnahmen",
-        "description": "Ausgenommene Entities werden weder gemeldet noch wiederhergestellt. Muster sind reguläre Ausdrücke auf die Entity-ID, z. B. .*_internet_access$",
+        "description": "Ausgenommene Entities werden weder gemeldet noch wiederhergestellt. Integrationen beziehen sich auf die Integration, die die Entity liefert (z. B. shelly, mqtt, hue). Muster sind reguläre Ausdrücke auf die Entity-ID, z. B. .*_internet_access$",
         "data": {
           "exclude_labels": "Ausgenommene Labels",
           "exclude_entities": "Ausgenommene Entities",
           "exclude_devices": "Ausgenommene Geräte",
           "exclude_areas": "Ausgenommene Bereiche",
+          "exclude_integrations": "Ausgenommene Integrationen",
           "exclude_patterns": "Ausgenommene Muster (Regex)"
         }
       },

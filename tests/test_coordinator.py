@@ -246,6 +246,30 @@ async def test_failed_reload_is_logged_as_error(hass, setup_watchguard, caplog):
     assert "boom" in caplog.text
 
 
+async def test_stage1_skipped_for_push_integrations(hass, setup_watchguard, update_entity_calls):
+    # mqtt is local_push: update_entity can't do anything for it, so stage 1
+    # must skip it and leave escalation to stage 2.
+    ent_reg = er.async_get(hass)
+    for platform, object_id in (("mqtt", "pump"), ("demo", "lamp")):
+        entry = ent_reg.async_get_or_create(
+            "light", platform, object_id, suggested_object_id=object_id
+        )
+        hass.states.async_set(entry.entity_id, "unavailable")
+
+    _, coordinator = await setup_watchguard(
+        **{CONF_STAGE1_ENABLED: True, CONF_STAGE1_DELAY: 300}
+    )
+    backdate(coordinator, 400)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert len(update_entity_calls) == 1
+    assert update_entity_calls[0].data["entity_id"] == ["light.lamp"]
+    # Marked as done so it isn't re-evaluated every cycle, but no attempt spent.
+    assert coordinator.tracked["light.pump"].stage1_at is not None
+    assert coordinator.tracked["light.pump"].attempts == 0
+
+
 async def test_stage2_retries_then_gives_up(hass, setup_watchguard):
     other = MockConfigEntry(domain="demo")
     other.add_to_hass(hass)
