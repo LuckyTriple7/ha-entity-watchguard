@@ -52,6 +52,8 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 | `binary_sensor.entity_watchguard_problem` | problem | ON when any watched domain has a problem. Attributes: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | count | Total across all watched domains, `per_domain` breakdown in the attributes |
 | `sensor.entity_watchguard_last_recovery_attempt` | timestamp | Diagnostic |
+| `button.entity_watchguard_check_now` | button | Scan immediately instead of waiting for the check interval — also ends the startup grace period early |
+| `button.entity_watchguard_recover_now` | button | Run stage 1 for everything currently unavailable, ignoring the delays |
 
 During the startup grace period every sensor stays `off` and reports `status: warming_up`.
 

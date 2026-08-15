@@ -17,7 +17,7 @@ from .const import (
 )
 from .coordinator import WatchguardCoordinator
 
-PLATFORMS = ["binary_sensor", "sensor"]
+PLATFORMS = ["binary_sensor", "button", "sensor"]
 
 RECOVER_NOW_SCHEMA = vol.Schema(
     {

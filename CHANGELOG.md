@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-08-15
+### Added
+- **Check now** button — scans immediately instead of waiting for the check interval. Pressing it also ends the startup grace period early, so a manual check right after a restart actually returns something
+- **Recover now** button — runs stage 1 for everything currently unavailable, ignoring the configured delays (same as the `recover_now` service without arguments)
+
 ## [0.1.1] - 2026-08-15
 ### Added
 - Log line (INFO) whenever entities go unavailable or come back — the recovery line includes how long the entity was gone and which stages ran, so the HA log shows what happened without turning on debug

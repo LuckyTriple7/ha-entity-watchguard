@@ -126,6 +126,17 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
 
         self.entry.async_on_unload(async_at_started(self.hass, _started))
 
+    async def async_check_now(self) -> None:
+        """Scan right now — pressing the button also ends the startup grace
+        period early, since asking for a check while the integration is still
+        warming up would otherwise return nothing."""
+        if self.warming_up:
+            _LOGGER.info("Manual check requested — ending the startup grace period early")
+            self._active_at = dt_util.utcnow()
+        else:
+            _LOGGER.debug("Manual check requested")
+        await self.async_refresh()
+
     async def async_shutdown(self) -> None:
         self.async_clear_notifications()
         await super().async_shutdown()
