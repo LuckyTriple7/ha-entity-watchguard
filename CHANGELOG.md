@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-08-18
+### Fixed
+- **The card showed "Custom element doesn't exist" in Firefox** (and any other browser Home Assistant doesn't classify as "modern"), while working fine in Chrome. The card was published with `frontend.add_extra_js_url()`, which Home Assistant renders into the index page as `<script>if (isModern) { import("<url>"); }</script>` — `isModern` being a user-agent regex plus a feature check. Where that check rejects, the import never runs and the card silently never registers. It is now registered as a normal **Lovelace resource** (Settings → Dashboards → Resources) instead, the same mechanism every HACS-installed card uses, which Lovelace loads regardless of that check. YAML resource mode still falls back to the old behaviour, since resources can't be managed programmatically there
+
 ## [0.7.3] - 2026-08-15
 ### Changed
 - The card follows the **user's Home Assistant language** instead of the browser's, and can be pinned with `language: de` / `language: en` (visual editor has a picker; default `auto`)

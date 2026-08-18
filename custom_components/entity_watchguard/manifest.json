@@ -1,15 +1,23 @@
 {
   "domain": "entity_watchguard",
   "name": "Entity Watchguard",
-  "after_dependencies": ["http", "frontend"],
-  "codeowners": ["@LuckyTriple7"],
+  "after_dependencies": [
+    "http",
+    "frontend",
+    "lovelace"
+  ],
+  "codeowners": [
+    "@LuckyTriple7"
+  ],
   "config_flow": true,
-  "dependencies": ["persistent_notification"],
+  "dependencies": [
+    "persistent_notification"
+  ],
   "documentation": "https://github.com/LuckyTriple7/ha-entity-watchguard",
   "integration_type": "service",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/LuckyTriple7/ha-entity-watchguard/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.7.3"
+  "version": "0.8.0"
 }
