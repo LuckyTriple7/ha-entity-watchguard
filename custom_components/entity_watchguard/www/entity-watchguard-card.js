@@ -21,10 +21,10 @@ const STRINGS = {
       since: "seit",
       attempts: "Versuche",
       gaveUp: "aufgegeben",
-      ignore: (label) => `Ignorieren (Label „${label}")`,
+      ignore: (label) => `Ignorieren (Label „${label}“)`,
       ignored: "Label gesetzt",
       checked: "Geprüft",
-      recovering: "Wiederherstellung gestartet",
+      recovering: "Wiederherstellung gestartet – Neuprüfung folgt",
       failed: "Fehlgeschlagen",
       noSensors: "Keine Entity-Watchguard-Sensoren gefunden.",
       more: (n) => `… und ${n} weitere`,
@@ -39,10 +39,10 @@ const STRINGS = {
       since: "since",
       attempts: "attempts",
       gaveUp: "gave up",
-      ignore: (label) => `Ignore (label "${label}")`,
+      ignore: (label) => `Ignore (label “${label}”)`,
       ignored: "Label applied",
       checked: "Checked",
-      recovering: "Recovery started",
+      recovering: "Recovery started – re-check follows",
       failed: "Failed",
       noSensors: "No Entity Watchguard sensors found.",
       more: (n) => `… and ${n} more`,
@@ -66,6 +66,14 @@ function isGerman(hass, config) {
 
 function strings(hass, config) {
   return isGerman(hass, config) ? STRINGS.de : STRINGS.en;
+}
+
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+/** Entity names and ids come from the user's setup and land in innerHTML (and
+ *  in title="…" attributes), so they have to be escaped. */
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
 }
 
 const DOMAIN_ICONS = {
@@ -283,7 +291,7 @@ class EntityWatchguardCard extends HTMLElement {
       <div class="header">
         <ha-icon icon="${total ? "mdi:shield-alert" : "mdi:shield-check"}"
                  class="${total ? "bad" : "good"}"></ha-icon>
-        <div class="title">${this._config.title ?? T.title}</div>
+        <div class="title">${esc(this._config.title ?? T.title)}</div>
         <div class="summary ${total ? "bad" : "good"}">
           ${warming ? T.warming : total ? `${total} ${T.offline}` : T.allOk}
         </div>
@@ -297,12 +305,12 @@ class EntityWatchguardCard extends HTMLElement {
       const open = this._expanded.has(sensor.domain);
       const icon = DOMAIN_ICONS[sensor.domain] || "mdi:shape-outline";
       html += `
-        <div class="row ${sensor.count ? "bad" : ""}" data-domain="${sensor.domain}">
+        <div class="row ${sensor.count ? "bad" : ""}" data-domain="${esc(sensor.domain)}">
           <ha-icon class="chevron" icon="${
             sensor.count ? (open ? "mdi:chevron-down" : "mdi:chevron-right") : "mdi:minus"
           }"></ha-icon>
           <ha-icon class="domain-icon" icon="${icon}"></ha-icon>
-          <div class="domain">${sensor.domain}</div>
+          <div class="domain">${esc(sensor.domain)}</div>
           <div class="badge ${sensor.count ? "bad" : "good"}">${sensor.count}</div>
         </div>`;
 
@@ -313,27 +321,27 @@ class EntityWatchguardCard extends HTMLElement {
         const note = this._flash.get(item.entity_id);
         html += `
           <div class="detail">
-            <div class="detail-main" data-entity="${item.entity_id}">
+            <div class="detail-main" data-entity="${esc(item.entity_id)}">
               <div class="name">
-                ${item.name}
+                <span class="name-text" title="${esc(item.name)}">${esc(item.name)}</span>
                 ${item.given_up ? `<span class="tag">${T.gaveUp}</span>` : ""}
               </div>
+              <div class="meta" title="${esc(item.entity_id)}">${esc(item.entity_id)}</div>
               <div class="meta">
-                ${item.entity_id} · ${T.since} ${timeOfDay(item.since, german)}
-                (${relativeAge(item.since)})
+                ${T.since} ${timeOfDay(item.since, german)} (${relativeAge(item.since)})
                 ${item.attempts ? ` · ${item.attempts} ${T.attempts}` : ""}
               </div>
             </div>
             ${
               this._config.allow_ignore
-                ? `<button class="ignore" data-ignore="${item.entity_id}"
-                     title="${T.ignore(this._config.ignore_label || "offline")}">
+                ? `<button class="ignore" data-ignore="${esc(item.entity_id)}"
+                     title="${T.ignore(esc(this._config.ignore_label || "offline"))}">
                      <ha-icon icon="mdi:label-off-outline"></ha-icon>
                    </button>`
                 : ""
             }
           </div>
-          ${note ? `<div class="note">${note}</div>` : ""}`;
+          ${note ? `<div class="note">${esc(note)}</div>` : ""}`;
       }
       if (sensor.truncated) {
         html += `<div class="note">${T.more(sensor.count - sensor.details.length)}</div>`;
@@ -342,7 +350,7 @@ class EntityWatchguardCard extends HTMLElement {
     }
 
     if (this._bannerText) {
-      html += `<div class="banner">${this._bannerText}</div>`;
+      html += `<div class="banner">${esc(this._bannerText)}</div>`;
     }
 
     if (this._config.show_buttons) {
@@ -378,8 +386,13 @@ class EntityWatchguardCard extends HTMLElement {
 EntityWatchguardCard.styles = `
   ha-card { padding: 12px 8px 4px; }
   .header { display: flex; align-items: center; gap: 10px; padding: 0 8px 8px; }
-  .title { font-size: 1.1rem; font-weight: 500; flex: 1; }
-  .summary { font-size: .9rem; }
+  /* min-width: 0 everywhere a flex child holds text — without it a flex item
+     refuses to shrink below its content and long names push out of the card. */
+  .title {
+    font-size: 1.1rem; font-weight: 500; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .summary { font-size: .9rem; flex: 0 0 auto; }
   .good { color: var(--success-color, #43a047); }
   .bad { color: var(--error-color, #db4437); }
   .empty { padding: 8px 12px; color: var(--secondary-text-color); }
@@ -390,7 +403,10 @@ EntityWatchguardCard.styles = `
   .row:hover { background: var(--secondary-background-color); }
   .row .chevron { --mdc-icon-size: 20px; color: var(--secondary-text-color); }
   .row .domain-icon { --mdc-icon-size: 20px; color: var(--state-icon-color, #44739e); }
-  .domain { flex: 1; }
+  .domain {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .badge {
     min-width: 24px; text-align: center; border-radius: 12px;
     padding: 1px 8px; font-size: .85rem;
@@ -399,12 +415,17 @@ EntityWatchguardCard.styles = `
   .badge.bad { background: var(--error-color, #db4437); color: #fff; }
   .details { padding: 0 8px 4px 36px; }
   .detail { display: flex; align-items: center; gap: 4px; }
-  .detail-main { flex: 1; padding: 4px 0; cursor: pointer; }
-  .detail-main:hover .name { text-decoration: underline; }
-  .name { font-size: .95rem; }
-  .meta { font-size: .75rem; color: var(--secondary-text-color); }
+  .detail-main { flex: 1; min-width: 0; padding: 4px 0; cursor: pointer; }
+  .detail-main:hover .name-text { text-decoration: underline; }
+  .name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .95rem; }
+  .name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta {
+    font-size: .75rem; color: var(--secondary-text-color);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   .tag {
-    font-size: .7rem; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
+    flex: 0 0 auto;
+    font-size: .7rem; padding: 1px 6px; border-radius: 8px;
     background: var(--error-color, #db4437); color: #fff;
   }
   .note { font-size: .75rem; color: var(--secondary-text-color); padding: 2px 0 6px; }

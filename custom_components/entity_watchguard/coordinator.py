@@ -8,13 +8,14 @@ from datetime import datetime, timedelta
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import label_registry as lr
 from homeassistant.loader import Integration, async_get_integrations
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -44,6 +45,12 @@ from .const import (
 from .filters import Exclusion, build_exclusion
 
 _LOGGER = logging.getLogger(__name__)
+
+# Stage 1 fires `update_entity` non-blocking and stage 2 reloads config entries
+# in the background, so the refresh at the end of a manual recovery still sees
+# the pre-recovery state. Re-scan at these offsets (seconds) so a dashboard
+# updates on its own instead of needing a manual "Check now" afterwards.
+RECOVERY_FOLLOWUP_DELAYS = (10, 30)
 
 
 def _outcome(entity_id: str, tracked: "Tracked", now: datetime) -> str:
@@ -160,6 +167,8 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         # only changes when the user edits something — so cache it and let the
         # registry events invalidate it. See async_setup_registry_listeners().
         self._exclusion: Exclusion | None = None
+        # Pending post-recovery re-scans; see _async_schedule_recovery_followups.
+        self._followup_cancels: list[CALLBACK_TYPE] = []
 
     # --- lifecycle ------------------------------------------------------
     @property
@@ -222,6 +231,7 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         await self.async_refresh()
 
     async def async_shutdown(self) -> None:
+        self._async_cancel_recovery_followups()
         self.async_clear_notifications()
         await super().async_shutdown()
 
@@ -551,6 +561,32 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         if escalate:
             await self.async_stage2(selected, now)
         await self.async_request_refresh()
+        self._async_schedule_recovery_followups()
+
+    @callback
+    def _async_schedule_recovery_followups(self) -> None:
+        """Re-scan a few times after a manual recovery.
+
+        Recovery only *starts* things: `update_entity` is dispatched without
+        waiting and a config entry reload runs as its own task. Without these
+        follow-ups the dashboard keeps showing the old counts until the next
+        check interval, which reads as if the button did nothing.
+        """
+        self._async_cancel_recovery_followups()
+
+        async def _followup(_now: datetime) -> None:
+            await self.async_refresh()
+
+        self._followup_cancels = [
+            async_call_later(self.hass, delay, _followup)
+            for delay in RECOVERY_FOLLOWUP_DELAYS
+        ]
+
+    @callback
+    def _async_cancel_recovery_followups(self) -> None:
+        for cancel in self._followup_cancels:
+            cancel()
+        self._followup_cancels = []
 
     # --- reporting: notifications, repairs, push -------------------------
     async def _async_report(self, now: datetime) -> None:

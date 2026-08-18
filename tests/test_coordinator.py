@@ -1,13 +1,19 @@
 """Scan, grace period, recovery escalation and notifications."""
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_mock_service
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+    async_mock_service,
+)
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 from custom_components.entity_watchguard.filters import build_exclusion
 
@@ -413,3 +419,24 @@ async def test_recover_now_service(hass, setup_watchguard, update_entity_calls):
 
     assert len(update_entity_calls) == 1
     assert update_entity_calls[0].data["entity_id"] == ["light.kitchen"]
+
+
+async def test_recover_now_schedules_followup_rescans(hass, setup_watchguard, update_entity_calls):
+    """Recovery only starts things, so the state has to be re-read afterwards."""
+    hass.states.async_set("light.kitchen", "unavailable")
+    _, coordinator = await setup_watchguard()
+
+    with patch.object(type(coordinator), "async_refresh", AsyncMock()) as refresh:
+        await hass.services.async_call(
+            "entity_watchguard", "recover_now", {"domain": "light"}, blocking=True
+        )
+        await hass.async_block_till_done()
+        assert refresh.call_count == 0
+
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=11))
+        await hass.async_block_till_done()
+        assert refresh.call_count == 1
+
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=31))
+        await hass.async_block_till_done()
+        assert refresh.call_count == 2

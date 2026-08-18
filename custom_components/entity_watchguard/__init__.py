@@ -30,7 +30,7 @@ PLATFORMS = ["binary_sensor", "button", "sensor"]
 
 # Bump alongside manifest.json's "version" so browsers pick up card changes
 # after a HACS update instead of serving a cached copy of the old script.
-CARD_VERSION = "0.8.0"
+CARD_VERSION = "0.9.0"
 STATIC_URL_PATH = "/entity_watchguard_static"
 CARD_PATH = f"{STATIC_URL_PATH}/entity-watchguard-card.js"
 CARD_URL = f"{CARD_PATH}?v={CARD_VERSION}"

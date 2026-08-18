@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-08-18
+### Added
+- After a manual **Recover now** (button or `entity_watchguard.recover_now` service), the integration re-scans automatically 10s and 30s later. Recovery only *starts* things — `update_entity` is dispatched without waiting and a config entry reload runs as its own task — so the refresh right after it still saw the old state and the card kept its old counts until someone pressed **Check now**
+
+### Fixed
+- Long entity names no longer push out of the card: names, entity ids, the card title and domain names are truncated with an ellipsis and carry the full text as a tooltip
+- `since <time>` moved to its own line below the entity id instead of running on after it
+- Entity names and ids are now HTML-escaped before being rendered — a name containing `<`, `&` or a quote could break the card's markup
+- The "Ignore (label …)" tooltip used a literal `"` inside a `title="…"` attribute, which cut the tooltip off at the label name
+
 ## [0.8.0] - 2026-08-18
 ### Fixed
 - **The card showed "Custom element doesn't exist" in Firefox** (and any other browser Home Assistant doesn't classify as "modern"), while working fine in Chrome. The card was published with `frontend.add_extra_js_url()`, which Home Assistant renders into the index page as `<script>if (isModern) { import("<url>"); }</script>` — `isModern` being a user-agent regex plus a feature check. Where that check rejects, the import never runs and the card silently never registers. It is now registered as a normal **Lovelace resource** (Settings → Dashboards → Resources) instead, the same mechanism every HACS-installed card uses, which Lovelace loads regardless of that check. YAML resource mode still falls back to the old behaviour, since resources can't be managed programmatically there
