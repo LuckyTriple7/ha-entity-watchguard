@@ -282,6 +282,26 @@ class EntityWatchguardCard extends HTMLElement {
       ? sensors
       : sensors.filter((sensor) => sensor.count > 0);
 
+    // `hass` is set again on *any* state change in the system, several times a
+    // second on a busy install, and each render replaced the card's whole
+    // innerHTML. That had two visible effects: a click whose mousedown target
+    // gets removed before mouseup never becomes a click event, so expanding a
+    // domain only worked sometimes — and the row under the pointer lost and
+    // regained :hover, which read as a flickering grey frame. So rebuild only
+    // when something actually on screen changed. The minute bucket is there to
+    // keep the relative ages ("5 min") ticking.
+    const signature = JSON.stringify([
+      this._config,
+      german,
+      visible,
+      [...this._expanded].sort(),
+      [...this._flash],
+      this._bannerText,
+      Math.floor(Date.now() / 60000),
+    ]);
+    if (signature === this._signature) return;
+    this._signature = signature;
+
     if (!this.shadowRoot.querySelector("ha-card")) {
       this.shadowRoot.innerHTML = `<style>${EntityWatchguardCard.styles}</style><ha-card></ha-card>`;
     }

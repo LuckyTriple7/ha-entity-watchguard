@@ -74,6 +74,22 @@ checks.push(["gave-up tag", expanded.includes("aufgegeben")]);
 checks.push(["attempts shown", expanded.includes("2 Versuche")]);
 checks.push(["ignore button inside row", expanded.includes('class="ignore"') && !expanded.includes("ha-icon-button")]);
 
+// Re-setting hass with unchanged data must not rebuild the DOM — doing so on
+// every state change in the system used to swallow clicks and flicker :hover.
+let rebuilds = 0;
+const cardNode = card.shadowRoot._card;
+Object.defineProperty(cardNode, "innerHTML", {
+  set(value) { rebuilds++; this._html = value; },
+  get() { return this._html; },
+  configurable: true,
+});
+card.hass = hass;
+card.hass = hass;
+checks.push(["unchanged hass does not rebuild the card", rebuilds === 0]);
+card._toggle("switch");
+checks.push(["expanding still rebuilds", rebuilds === 1]);
+card._toggle("switch");
+
 card.setConfig({ type: "custom:entity-watchguard-card", language: "en" });
 card.hass = hass;
 checks.push(["forced language:en overrides hass", card.shadowRoot._card.innerHTML.includes("Check now")]);

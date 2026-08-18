@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1] - 2026-08-18
+### Fixed
+- Expanding a domain row often needed two or three clicks, and the row's grey hover highlight flickered. The card re-rendered on every `hass` update — which fires on *any* state change in the system, several times a second on a busy install — and each render replaced the card's entire DOM. A click whose `mousedown` target is removed before `mouseup` never becomes a click event, hence the swallowed taps. The card now only rebuilds when something actually on screen changed (relative ages still tick once a minute)
+
 ## [0.9.0] - 2026-08-18
 ### Added
 - After a manual **Recover now** (button or `entity_watchguard.recover_now` service), the integration re-scans automatically 10s and 30s later. Recovery only *starts* things — `update_entity` is dispatched without waiting and a config entry reload runs as its own task — so the refresh right after it still saw the old state and the card kept its old counts until someone pressed **Check now**
