@@ -19,7 +19,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - Startup grace period: after a Home Assistant restart the integration stays quiet for a configurable time, because entities need a few minutes to come up
 - Three reporting channels, each switchable: **persistent notifications** (one per domain, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
 - **Check now** / **Recover now** buttons for everything you don't want to wait for
-- Bundled **dashboard card** with per-domain rows, per-entity outage details, and a one-click "ignore this entity" action
+- Matching **dashboard card**, [Entity Watchguard Card](https://github.com/LuckyTriple7/ha-entity-watchguard-card), with per-domain rows, per-entity outage details and a one-click "ignore this entity" action; installed separately from HACS
 - Light on CPU: one in-memory scan per interval (default 60 s), no template rendering and no state-change listeners. Long entity lists are kept out of the recorder
 
 ## How it works
@@ -40,26 +40,23 @@ The record is dropped the moment the entity is available again, so every timer s
 
 ## Dashboard card
 
-A Lovelace card ships with the integration and registers itself — no resource setup needed. Add a card, search for **Entity Watchguard**, or use YAML:
+The card has its own repository: **[Entity Watchguard Card](https://github.com/LuckyTriple7/ha-entity-watchguard-card)** (`custom:entity-watchguard-card`) — one row per watched domain, expandable into the entities that are actually missing, with the recovery actions right there.
 
-```yaml
-type: custom:entity-watchguard-card
-title: Entity Watchguard      # optional
-show_ok_domains: true         # also list domains with nothing wrong
-show_buttons: true            # Check now / Recover now
-allow_ignore: true            # per-entity "ignore" action
-ignore_label: offline         # label applied by that action
-language: auto                # auto | de | en
-```
+Install it from HACS → **Dashboard** → **Entity Watchguard Card**. HACS registers the Lovelace resource itself; this integration does not write to your resource store.
 
-- One row per watched domain with a counter; click to expand the affected entities
-- Each entity shows since when it's been gone, how many recovery attempts ran, and whether Watchguard gave up
-- Click an entity for its more-info dialog
-- The label button applies your ignore label to that entity — it's excluded from the next scan on, provided that label is listed under Configure → Exceptions. The label is created on first use
-- German and English; follows the user's Home Assistant language, or set `language: de` / `en` explicitly
-- Has a visual editor
+### Upgrading from 0.9.1 or earlier
 
-> After a HACS update, do a full **restart** (not just a reload) and hard-refresh the browser — the card is served with a version-stamped URL, but the frontend caches aggressively.
+The card used to ship inside this integration, which registered a Lovelace resource pointing at `/entity_watchguard_static/entity-watchguard-card.js`. Version 1.0.0 removes that resource on the next start and stops serving that path.
+
+**Install the card first, then update the integration** — that way the card is never missing:
+
+1. Install **Entity Watchguard Card** from HACS → **Dashboard**. While it is not in the HACS catalogue yet: HACS → ⋮ → **Custom repositories** → URL `https://github.com/LuckyTriple7/ha-entity-watchguard-card`, category **Dashboard**
+2. Update this integration and restart Home Assistant. The old resource is removed on that start
+3. Reload the browser (Ctrl+F5 / Cmd+Shift+R)
+
+Between steps 1 and 2 both resources exist briefly; that is harmless, the card only registers its custom element once. Doing it the other way round leaves your cards as "Custom element doesn't exist" until the card is installed — nothing breaks, but they render empty.
+
+Your card configuration needs no changes: same card type, same options.
 
 ## Installation via HACS
 
@@ -137,11 +134,10 @@ logger:
 
 ```bash
 pip install -r requirements_test.txt
-pytest                    # integration tests
-node tests/card/smoke.js  # renders the card against DOM stubs, no dependencies
+pytest    # integration tests
 ```
 
-The card test asserts on the produced HTML — that no frontend-internal elements are used, that nothing renders as `undefined`, and that the language switching works. Both suites run in CI on every push, alongside hassfest and the HACS validation.
+The suite runs in CI on every push, alongside hassfest and the HACS validation. The card has its own tests in [its repository](https://github.com/LuckyTriple7/ha-entity-watchguard-card).
 
 ## Notes
 

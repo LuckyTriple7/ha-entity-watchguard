@@ -79,9 +79,17 @@ class WatchguardDomainProblem(WatchguardEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         report = self._report
+        # `domain` identifies which domain this sensor covers without anyone
+        # having to parse it back out of the entity id — the card reads it,
+        # and it stays correct when the entity or the device is renamed.
         if self._warming_up or report is None:
-            return {"status": STATUS_WARMING_UP if self._warming_up else STATUS_OK, "count": 0}
+            return {
+                "domain": self._domain,
+                "status": STATUS_WARMING_UP if self._warming_up else STATUS_OK,
+                "count": 0,
+            }
         return {
+            "domain": self._domain,
             "status": STATUS_PROBLEM if report.count else STATUS_OK,
             "count": report.count,
             "unavailable_entities": _capped(report.entity_ids),
@@ -103,7 +111,7 @@ class WatchguardOverallProblem(WatchguardEntity, BinarySensorEntity):
     def __init__(self, coordinator: WatchguardCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_problem"
-        self._attr_name = "Problem"
+        self._attr_translation_key = "problem"
 
     @property
     def is_on(self) -> bool:

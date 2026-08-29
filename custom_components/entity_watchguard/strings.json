@@ -115,5 +115,20 @@
       "name": "Clear notifications",
       "description": "Dismisses all persistent notifications created by Entity Watchguard."
     }
+  },
+  "entity": {
+    "button": {
+      "check_now": {
+        "name": "Check now"
+      },
+      "recover_now": {
+        "name": "Recover now"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Problem"
+      }
+    }
   }
 }

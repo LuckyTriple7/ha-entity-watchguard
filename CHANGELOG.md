@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-08-29
+### Breaking
+- **The dashboard card now lives in its own repository, [ha-entity-watchguard-card](https://github.com/LuckyTriple7/ha-entity-watchguard-card), and has to be installed separately** (HACS → Dashboard → *Entity Watchguard Card*). Up to 0.9.1 the card shipped inside this integration, which registered a Lovelace resource for it under `/entity_watchguard_static/`. Writing the user's shared `lovelace_resources` store from a config entry is not an integration's job — HACS does that as the package manager, visibly and with an uninstall path. Install the card first, then update this integration, and your dashboards never go without it. Card configuration is unchanged
+- The minimum Home Assistant version is now declared as **2024.12.0**. The previously declared 2024.6.0 was never accurate: `lovelace.const.LOVELACE_DATA` only exists from 2025.2, the `resource_mode` attribute read in 0.9.1 only from 2026.2, `StaticPathConfig` from 2024.7, and the implicit `OptionsFlow.config_entry` from 2024.12. Dropping the card removed the first three constraints, so the real floor is now the options-flow one
+
+### Added
+- A one-time cleanup on start removes the Lovelace resource earlier versions registered under `/entity_watchguard_static/`. Without it, updating would leave a resource pointing at a path nothing serves any more, which Lovelace retries on every dashboard render. Nothing else in the resource store is touched, and the integration never writes to it again
+- The per-domain problem sensors expose the domain they cover as a `domain` attribute, so the card no longer has to parse it back out of the entity id
+- The two buttons and the aggregate problem sensor are named through translations (`check_now`, `recover_now`, `problem`), which also gives them proper German names. Entity ids are unchanged, and the card matches the buttons on their translation key rather than on their id
+
+### Changed
+- The download no longer carries the card
+
 ## [0.9.1] - 2026-08-18
 ### Fixed
 - Expanding a domain row often needed two or three clicks, and the row's grey hover highlight flickered. The card re-rendered on every `hass` update — which fires on *any* state change in the system, several times a second on a busy install — and each render replaced the card's entire DOM. A click whose `mousedown` target is removed before `mouseup` never becomes a click event, hence the swallowed taps. The card now only rebuilds when something actually on screen changed (relative ages still tick once a minute)

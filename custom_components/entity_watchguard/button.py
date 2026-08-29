@@ -33,7 +33,7 @@ class WatchguardCheckNowButton(WatchguardEntity, ButtonEntity):
     def __init__(self, coordinator: WatchguardCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_check_now"
-        self._attr_name = "Check now"
+        self._attr_translation_key = "check_now"
 
     async def async_press(self) -> None:
         await self.coordinator.async_check_now()
@@ -47,7 +47,7 @@ class WatchguardRecoverNowButton(WatchguardEntity, ButtonEntity):
     def __init__(self, coordinator: WatchguardCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_recover_now"
-        self._attr_name = "Recover now"
+        self._attr_translation_key = "recover_now"
 
     async def async_press(self) -> None:
         await self.coordinator.async_recover_now()

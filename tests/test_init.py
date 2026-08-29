@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.entity_watchguard import _async_remove_legacy_card_resource
+
 from custom_components.entity_watchguard.const import (
     CONF_MONITORED_DOMAINS,
     DOMAIN,
@@ -42,11 +44,87 @@ async def test_options_update_reloads_entry(hass, setup_watchguard):
     assert coordinator.monitored_domains == ["light"]
 
 
-async def test_frontend_registration_is_skipped_without_http(hass, setup_watchguard):
-    # hass.http is None in the test harness — registration must not raise, and
-    # the guard flag still gets set so a reload doesn't retry it.
+class _FakeResources:
+    """Stand-in for Lovelace's ResourceStorageCollection."""
+
+    def __init__(self, items, *, loaded=True, store=object()):
+        self._items = list(items)
+        self.loaded = loaded
+        self.store = store
+        self.deleted = []
+        self.load_calls = 0
+
+    def async_items(self):
+        return list(self._items)
+
+    async def async_load(self):
+        self.loaded = True
+        self.load_calls += 1
+
+    async def async_delete_item(self, item_id):
+        self.deleted.append(item_id)
+        self._items = [item for item in self._items if item["id"] != item_id]
+
+
+class _FakeLovelace:
+    def __init__(self, resources):
+        self.resources = resources
+
+
+LEGACY_ITEM = {"id": "legacy", "url": "/entity_watchguard_static/entity-watchguard-card.js?v=0.9.1"}
+HACS_ITEM = {"id": "hacs", "url": "/hacsfiles/ha-entity-watchguard-card/entity-watchguard-card.js"}
+OTHER_ITEM = {"id": "other", "url": "/local/some-unrelated-card.js"}
+
+
+async def test_legacy_card_resource_is_removed(hass):
+    resources = _FakeResources([LEGACY_ITEM, HACS_ITEM, OTHER_ITEM])
+    hass.data["lovelace"] = _FakeLovelace(resources)
+
+    await _async_remove_legacy_card_resource(hass)
+
+    assert resources.deleted == ["legacy"]
+    assert [item["id"] for item in resources.async_items()] == ["hacs", "other"]
+
+
+async def test_legacy_cleanup_loads_an_unloaded_store(hass):
+    resources = _FakeResources([LEGACY_ITEM], loaded=False)
+    hass.data["lovelace"] = _FakeLovelace(resources)
+
+    await _async_remove_legacy_card_resource(hass)
+
+    assert resources.load_calls == 1
+    assert resources.deleted == ["legacy"]
+
+
+async def test_legacy_cleanup_is_a_no_op_in_yaml_resource_mode(hass):
+    # No store behind the collection — YAML resources can't be managed
+    # programmatically, and those users never had a resource written.
+    resources = _FakeResources([LEGACY_ITEM], store=None)
+    hass.data["lovelace"] = _FakeLovelace(resources)
+
+    await _async_remove_legacy_card_resource(hass)
+
+    assert resources.deleted == []
+
+
+async def test_legacy_cleanup_without_lovelace(hass):
+    hass.data.pop("lovelace", None)
+
+    await _async_remove_legacy_card_resource(hass)  # must not raise
+
+
+async def test_legacy_cleanup_reads_a_plain_dict_as_used_before_ha_2025_2(hass):
+    resources = _FakeResources([LEGACY_ITEM])
+    hass.data["lovelace"] = {"resources": resources}
+
+    await _async_remove_legacy_card_resource(hass)
+
+    assert resources.deleted == ["legacy"]
+
+
+async def test_legacy_cleanup_is_scheduled_once(hass, setup_watchguard):
     await setup_watchguard()
-    assert hass.data[DOMAIN]["frontend_registered"] is True
+    assert hass.data[DOMAIN]["legacy_cleanup_scheduled"] is True
 
 
 async def test_dropped_domain_entity_is_removed(hass, setup_watchguard):

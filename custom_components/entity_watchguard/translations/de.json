@@ -115,5 +115,20 @@
       "name": "Benachrichtigungen löschen",
       "description": "Verwirft alle von Entity Watchguard erzeugten persistenten Benachrichtigungen."
     }
+  },
+  "entity": {
+    "button": {
+      "check_now": {
+        "name": "Jetzt prüfen"
+      },
+      "recover_now": {
+        "name": "Jetzt wiederherstellen"
+      }
+    },
+    "binary_sensor": {
+      "problem": {
+        "name": "Problem"
+      }
+    }
   }
 }
