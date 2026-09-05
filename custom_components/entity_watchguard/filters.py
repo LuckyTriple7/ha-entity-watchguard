@@ -79,7 +79,8 @@ def build_exclusion(hass: HomeAssistant, options: dict) -> Exclusion:
         # A label on a device or an area exempts everything below it.
         area_reg = ar.async_get(hass)
         areas |= {area.id for area in area_reg.async_list_areas() if labels & set(area.labels)}
-        devices |= {device.id for device in dev_reg.devices.values() if labels & set(device.labels)}
+        for label in labels:
+            devices |= {device.id for device in dr.async_entries_for_label(dev_reg, label)}
 
     if labels or devices or areas or integrations:
         for entry in ent_reg.entities.values():

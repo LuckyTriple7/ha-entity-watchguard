@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-09-05
+### Fixed
+- Label-based device exclusions used `device_registry.devices` as a plain dict (`.values()`), which Home Assistant flags as deprecated and will remove in 2027.9.0. Now resolved through `device_registry.async_entries_for_label()`, the supported indexed lookup
+
 ## [1.0.0] - 2026-08-29
 ### Breaking
 - **The dashboard card now lives in its own repository, [ha-entity-watchguard-card](https://github.com/LuckyTriple7/ha-entity-watchguard-card), and has to be installed separately** (HACS → Dashboard → *Entity Watchguard Card*). Up to 0.9.1 the card shipped inside this integration, which registered a Lovelace resource for it under `/entity_watchguard_static/`. Writing the user's shared `lovelace_resources` store from a config entry is not an integration's job — HACS does that as the package manager, visibly and with an uninstall path. Install the card first, then update this integration, and your dashboards never go without it. Card configuration is unchanged
