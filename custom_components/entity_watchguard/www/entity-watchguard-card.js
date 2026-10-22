@@ -8,7 +8,7 @@
  */
 
 // Kept equal to manifest.json's "version" — tests/card/smoke.js enforces it.
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1";
 // The custom element tag — note the dashes. The integration domain
 // (entity_watchguard) is not a valid custom element name.
 const CARD_TAG = "entity-watchguard-card";

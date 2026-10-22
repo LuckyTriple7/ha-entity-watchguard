@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-10-22
+### Fixed
+- The startup grace period was armed from a worker thread instead of the event loop: the callback passed to `async_at_started` was a plain function, which Home Assistant runs in the executor. It could race the first refresh, so right after setup the integration could briefly still count as warming up. It is a `@callback` now and runs in order on the event loop
+
 ## [1.1.0] - 2026-10-22
 ### Changed
 - **The dashboard card ships with the integration again.** The standalone HACS dashboard repository *Entity Watchguard Card* is retired: the card only works with this integration, so it belongs in it (HACS review feedback on hacs/default#10453). It is served from `/entity_watchguard_static/entity-watchguard-card.js`, the same path as up to 0.9.1. Card type and options are unchanged

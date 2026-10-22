@@ -192,6 +192,9 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
     def async_setup_activation(self) -> None:
         """Arm the startup grace period once HA is fully started."""
 
+        # @callback keeps this on the event loop: a plain function would be
+        # handed to the executor and race the first refresh.
+        @callback
         def _started(_hass: HomeAssistant) -> None:
             delay = timedelta(seconds=self.options[CONF_STARTUP_DELAY])
             self._active_at = dt_util.utcnow() + delay
