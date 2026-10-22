@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-10-22
+### Changed
+- **The dashboard card ships with the integration again.** The standalone HACS dashboard repository *Entity Watchguard Card* is retired: the card only works with this integration, so it belongs in it (HACS review feedback on hacs/default#10453). It is served from `/entity_watchguard_static/entity-watchguard-card.js`, the same path as up to 0.9.1. Card type and options are unchanged
+
+### Added
+- The integration keeps exactly one Lovelace resource for its card: created on start when missing, its `?v=` updated after an update, duplicates collapsed. Only entries under its own static path are touched; nothing else in the resource store is changed
+- **The resource is removed when the integration is deleted** (`async_remove_entry`), so no dead resource is left behind for Lovelace to retry on every dashboard render
+- In YAML resource mode nothing is written; the log names the URL to add manually
+- If the retired standalone card is still installed, a warning in the log says to remove it in HACS. Its resource is not touched — it belongs to HACS
+- The card defines its custom element only once, so having both copies loaded during the switch is harmless instead of throwing `has already been defined`
+- The resource version is read from `manifest.json` at runtime instead of a hand-kept constant; the card smoke test fails if the card's own `CARD_VERSION` drifts from it
+- CI now runs the pytest suite and the card smoke test on every push
+
+### Notes
+- The declared minimum stays **2024.12.0**. The resource store is reached through `hass.data["lovelace"]`, not `lovelace.const.LOVELACE_DATA` (2025.2) or the `resource_mode` attribute (2026.2); `StaticPathConfig` needs 2024.7
+
 ## [1.0.1] - 2026-09-05
 ### Fixed
 - Label-based device exclusions used `device_registry.devices` as a plain dict (`.values()`), which Home Assistant flags as deprecated and will remove in 2027.9.0. Now resolved through `device_registry.async_entries_for_label()`, the supported indexed lookup

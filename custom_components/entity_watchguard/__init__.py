@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import voluptuous as vol
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.loader import async_get_integration
 
 from .const import (
     ATTR_DOMAIN,
@@ -25,59 +28,118 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["binary_sensor", "button", "sensor"]
 
-# Up to 0.9.1 the Lovelace card shipped inside this integration, served from
-# this static path and registered as a Lovelace resource by the integration.
-# The card is its own HACS dashboard repository now
-# (https://github.com/LuckyTriple7/ha-entity-watchguard-card), so the path is
-# gone and any leftover resource pointing at it has to go with it.
-LEGACY_STATIC_URL_PATH = "/entity_watchguard_static/"
+# The dashboard card ships in www/ and is served from here. The same path was
+# used up to 0.9.1, so a resource left over from back then is simply updated.
+STATIC_URL_PATH = "/entity_watchguard_static"
+CARD_PATH = f"{STATIC_URL_PATH}/entity-watchguard-card.js"
+# The card lived in its own HACS dashboard repository for 1.0.x. If that copy
+# is still installed it is HACS's resource, not ours — we only point it out.
+STANDALONE_CARD_MARKER = "/ha-entity-watchguard-card/"
+# Survives unloading the entry: a static route can't be removed again, and
+# registering it twice on a reload would fail.
+STATIC_REGISTERED_KEY = f"{DOMAIN}_static_registered"
 
 
-async def _async_remove_legacy_card_resource(hass: HomeAssistant) -> None:
-    """Delete the Lovelace resource earlier versions of this integration wrote.
+async def _async_register_static_path(hass: HomeAssistant) -> None:
+    # The http component isn't loaded in the unit test harness.
+    if getattr(hass, "http", None) is None or hass.data.get(STATIC_REGISTERED_KEY):
+        return
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(STATIC_URL_PATH, str(Path(__file__).parent / "www"), cache_headers=False)]
+    )
+    hass.data[STATIC_REGISTERED_KEY] = True
 
-    Without this, updating leaves a resource pointing at a path nothing serves
-    any more, which Lovelace then retries on every dashboard render, forever.
-    Only entries under the old static path are touched — the rest of the
-    user's resource store is left alone, and once this has run the integration
-    never writes to it again.
+
+def _resource_collection(hass: HomeAssistant):
+    """Return Lovelace's resource collection, or None if it can't be managed.
+
+    Read through hass.data instead of importing from lovelace.const: the
+    LOVELACE_DATA key only exists from HA 2025.2 and the attribute holding the
+    resource mode was renamed in 2026.2. Neither is needed here — YAML resource
+    mode is recognised by the collection having no store behind it.
     """
-    # Read through hass.data instead of importing from lovelace.const: the
-    # LOVELACE_DATA key only exists from HA 2025.2, and the attribute holding
-    # the resource mode was renamed in 2026.2. Neither is worth raising the
-    # minimum HA version for a one-time cleanup.
     lovelace = hass.data.get("lovelace")
     if lovelace is None:
-        return
+        return None
     if isinstance(lovelace, dict):  # HA < 2025.2 kept a plain dict here
         resources = lovelace.get("resources")
     else:
         resources = getattr(lovelace, "resources", None)
-    # YAML resource mode has no store behind it and can't be managed
-    # programmatically — those users never got a resource written either.
     if resources is None or getattr(resources, "store", None) is None:
-        return
+        return None
+    return resources
 
+
+def _is_own_resource(item: dict) -> bool:
+    return str(item.get("url", "")).split("?")[0] == CARD_PATH
+
+
+async def _async_card_url(hass: HomeAssistant) -> str:
+    # ?v= follows the manifest version, so browsers fetch the new card after
+    # an update instead of serving a cached copy.
+    integration = await async_get_integration(hass, DOMAIN)
+    return f"{CARD_PATH}?v={integration.version}"
+
+
+async def _async_sync_card_resource(hass: HomeAssistant) -> None:
+    """Make sure exactly one Lovelace resource points at the bundled card.
+
+    Only the entry under this integration's own static path is created,
+    updated or removed; the rest of the user's resource store is left alone.
+    async_remove_entry deletes it again when the integration is removed.
+    """
+    card_url = await _async_card_url(hass)
+    resources = _resource_collection(hass)
+    if resources is None:
+        _LOGGER.info(
+            "Lovelace resources are managed in YAML; add %s as a module resource "
+            "to use the Entity Watchguard card",
+            card_url,
+        )
+        return
+    if not resources.loaded:
+        await resources.async_load()
+
+    items = list(resources.async_items() or [])
+    own = [item for item in items if _is_own_resource(item)]
+    if own:
+        first, *duplicates = own
+        if first.get("url") != card_url or first.get("type") != "module":
+            await resources.async_update_item(first["id"], {"res_type": "module", "url": card_url})
+        for item in duplicates:
+            await resources.async_delete_item(item["id"])
+    else:
+        await resources.async_create_item({"res_type": "module", "url": card_url})
+
+    for item in items:
+        if STANDALONE_CARD_MARKER in str(item.get("url", "")):
+            _LOGGER.warning(
+                "The Entity Watchguard card ships with the integration again. The standalone "
+                "'Entity Watchguard Card' from HACS (%s) is no longer needed — remove it in "
+                "HACS so the dashboard doesn't load the card twice",
+                item["url"],
+            )
+
+
+async def _async_remove_card_resource(hass: HomeAssistant) -> None:
+    resources = _resource_collection(hass)
+    if resources is None:
+        return
     if not resources.loaded:
         await resources.async_load()
     for item in list(resources.async_items() or []):
-        if not str(item.get("url", "")).startswith(LEGACY_STATIC_URL_PATH):
-            continue
-        _LOGGER.info(
-            "Removing the Lovelace resource this integration registered before the card "
-            "moved to its own repository: %s. Install 'Entity Watchguard Card' from HACS "
-            "to keep using it",
-            item["url"],
-        )
-        await resources.async_delete_item(item["id"])
+        if _is_own_resource(item):
+            await resources.async_delete_item(item["id"])
 
 
-async def _async_schedule_legacy_cleanup(hass: HomeAssistant) -> None:
+async def _async_setup_card(hass: HomeAssistant) -> None:
+    await _async_register_static_path(hass)
+
     async def _run(_hass: HomeAssistant) -> None:
         try:
-            await _async_remove_legacy_card_resource(hass)
-        except Exception:  # noqa: BLE001 - cleanup must never break setup
-            _LOGGER.warning("Could not clean up the legacy card resource", exc_info=True)
+            await _async_sync_card_resource(hass)
+        except Exception:  # noqa: BLE001 - the card must never break setup
+            _LOGGER.warning("Could not register the dashboard card resource", exc_info=True)
 
     # Lovelace may not be set up yet when this entry is added; running at
     # start covers both a cold boot and an entry added while HA is running.
@@ -95,9 +157,9 @@ RECOVER_NOW_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     domain_data = hass.data.setdefault(DOMAIN, {})
-    if not domain_data.get("legacy_cleanup_scheduled"):
-        await _async_schedule_legacy_cleanup(hass)
-        domain_data["legacy_cleanup_scheduled"] = True
+    if not domain_data.get("card_scheduled"):
+        await _async_setup_card(hass)
+        domain_data["card_scheduled"] = True
 
     coordinator = WatchguardCoordinator(hass, entry)
     coordinator.async_setup_activation()
@@ -122,13 +184,25 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         domain_data = hass.data.get(DOMAIN, {})
         if (coordinator := domain_data.pop(entry.entry_id, None)) is not None:
             coordinator.async_clear_notifications()
-        # hass.data[DOMAIN] also holds the legacy_cleanup_scheduled flag, so
+        # hass.data[DOMAIN] also holds the card_scheduled flag, so
         # check for remaining coordinators rather than for an empty dict.
         if not _coordinators(hass):
             hass.data.pop(DOMAIN, None)
             for service in (SERVICE_RECOVER_NOW, SERVICE_CLEAR_NOTIFICATIONS):
                 hass.services.async_remove(DOMAIN, service)
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Take the card's Lovelace resource with the integration when it is removed.
+
+    Otherwise the resource keeps pointing at a path nothing serves any more,
+    and Lovelace retries it on every dashboard render.
+    """
+    try:
+        await _async_remove_card_resource(hass)
+    except Exception:  # noqa: BLE001 - removal must go through regardless
+        _LOGGER.warning("Could not remove the dashboard card resource", exc_info=True)
 
 
 def _async_remove_stale_entities(

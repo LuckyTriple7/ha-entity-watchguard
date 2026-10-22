@@ -19,7 +19,7 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 - Startkarenz: Nach einem Neustart von Home Assistant bleibt die Integration eine einstellbare Zeit still, weil Entities einige Minuten brauchen, bis sie da sind
 - Drei Meldewege, jeder einzeln abschaltbar: **persistente Benachrichtigungen** (eine pro Domain, aktualisiert sich selbst, verschwindet automatisch, Entities pro Gerät gruppiert), **Reparatur-Hinweise** (pro Domain ignorierbar) und ein optionaler **Notify-Dienst** für Push aufs Handy
 - Buttons **Jetzt prüfen** / **Wiederherstellen** für alles, worauf du nicht warten willst
-- Passende **Dashboard-Karte**, [Entity Watchguard Card](https://github.com/LuckyTriple7/ha-entity-watchguard-card), mit Zeilen pro Domain, Ausfall-Details pro Entity und einer Ein-Klick-Aktion „diese Entity ignorieren"; separat über HACS installiert
+- Eingebaute **Dashboard-Karte** mit Zeilen pro Domain, Ausfall-Details pro Entity und einer Ein-Klick-Aktion „diese Entity ignorieren" — wird automatisch registriert, nichts separat zu installieren
 - Schonend für die CPU: ein Scan im Arbeitsspeicher pro Intervall (Standard 60 s), kein Template-Rendering und keine State-Change-Listener. Lange Entity-Listen bleiben aus dem Recorder heraus
 
 ## Funktionsweise
@@ -40,23 +40,44 @@ Der Eintrag verschwindet in dem Moment, in dem die Entity wieder verfügbar ist 
 
 ## Dashboard-Karte
 
-Die Karte hat ein eigenes Repository: **[Entity Watchguard Card](https://github.com/LuckyTriple7/ha-entity-watchguard-card)** (`custom:entity-watchguard-card`) — eine Zeile pro überwachter Domain, aufklappbar zu den tatsächlich fehlenden Entities, mit den Wiederherstellungs-Aktionen direkt daneben.
+Die Integration bringt ihre eigene Dashboard-Karte mit, `custom:entity-watchguard-card` — eine Zeile pro überwachter Domain, aufklappbar zu den tatsächlich fehlenden Entities, mit den Wiederherstellungs-Aktionen direkt daneben. Separat installieren musst du nichts.
 
-Installation über HACS → **Dashboard** → **Entity Watchguard Card**. HACS registriert die Lovelace-Ressource selbst; diese Integration schreibt nicht in deinen Ressourcen-Speicher.
+| Alles in Ordnung | Ein Ausfall, aufgeklappt |
+|---|---|
+| ![Entity Watchguard Card mit allen Domains verfügbar](images/card-all-ok.png) | ![Entity Watchguard Card mit 18 nicht verfügbaren Sensor-Entities](images/card-outage.png) |
 
-### Umstieg von 0.9.1 oder älter
+Karte hinzufügen, nach **Entity Watchguard** suchen, oder per YAML:
 
-Die Karte steckte bisher in dieser Integration, die dafür eine Lovelace-Ressource mit Ziel `/entity_watchguard_static/entity-watchguard-card.js` registriert hat. Version 1.0.0 entfernt diese Ressource beim nächsten Start und bedient den Pfad nicht mehr.
+```yaml
+type: custom:entity-watchguard-card
+title: Entity Watchguard      # optional
+show_ok_domains: true         # auch Domains ohne Problem auflisten
+show_buttons: true            # Jetzt prüfen / Wiederherstellen
+allow_ignore: true            # Ignorieren-Aktion pro Entity
+ignore_label: offline         # Label, das diese Aktion setzt
+language: auto                # auto | de | en
+```
 
-**Erst die Karte installieren, dann die Integration aktualisieren** — so fehlt die Karte zu keinem Zeitpunkt:
+- Eine Zeile pro überwachter Domain mit Zähler; Klick klappt die betroffenen Entities auf
+- Jede Entity zeigt, seit wann sie weg ist, wie viele Wiederherstellungsversuche liefen und ob Watchguard aufgegeben hat
+- Der Label-Button setzt dein Ignorier-Label auf diese Entity — ab dem nächsten Scan ist sie ausgenommen, sofern dieses Label unter Konfigurieren → Ausnahmen eingetragen ist. Das Label wird bei der ersten Verwendung angelegt
+- Deutsch und Englisch, folgt der Home-Assistant-Sprache des Benutzers; mit grafischem Editor
+- Findet ihre Entities über die Entity-Registry (Plattform, Attribut `domain`, Translation-Keys) — umbenannte Entities oder ein umbenanntes Gerät brechen sie nicht
 
-1. **Entity Watchguard Card** über HACS → **Dashboard** installieren. Solange sie noch nicht im HACS-Katalog ist: HACS → ⋮ → **Benutzerdefinierte Repositories** → URL `https://github.com/LuckyTriple7/ha-entity-watchguard-card`, Kategorie **Dashboard**
-2. Diese Integration aktualisieren und Home Assistant neu starten. Bei diesem Start wird die alte Ressource entfernt
-3. Browser neu laden (Strg+F5 / Cmd+Shift+R)
+### Wie die Karte geladen wird
 
-Zwischen Schritt 1 und 2 existieren beide Ressourcen kurzzeitig — das ist harmlos, die Karte registriert ihr Custom Element nur einmal. Andersherum stehen deine Karten bis zur Installation auf „Custom element doesn't exist" — kaputt geht nichts, sie bleiben nur leer.
+Die Integration stellt die Karte unter `/entity_watchguard_static/entity-watchguard-card.js` bereit und pflegt **eine** Lovelace-Ressource (Einstellungen → Dashboards → ⋮ → Ressourcen), die darauf zeigt:
 
-An deiner Kartenkonfiguration ändert sich nichts: gleicher Kartentyp, gleiche Optionen.
+- beim Start angelegt, falls sie fehlt; nach einem Update wird ihr `?v=` angepasst, damit der Browser die neue Karte lädt
+- nur dieser eine Eintrag wird je angefasst — deine übrigen Ressourcen bleiben unberührt
+- **beim Löschen der Integration wird sie wieder entfernt**
+- werden die Ressourcen per YAML verwaltet, wird nichts geschrieben; das Log nennt die URL, die du selbst als `module`-Ressource einträgst
+
+Nach einem Update den Browser einmal neu laden (Strg+F5 / Cmd+Shift+R).
+
+### Umstieg von der eigenständigen Karte (1.0.x)
+
+In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard Card*. Das ist eingestellt — entferne es in HACS (Dashboard → Entity Watchguard Card → Menü ⋮). Bis dahin werden beide Kopien geladen; das ist harmlos, nur die erste definiert die Karte, und das Log erinnert dich daran. An deiner Kartenkonfiguration ändert sich nichts.
 
 ## Installation über HACS
 
@@ -134,10 +155,11 @@ logger:
 
 ```bash
 pip install -r requirements_test.txt
-pytest    # Integrationstests
+pytest                   # Integrationstests
+node tests/card/smoke.js # Karte
 ```
 
-Der Testlauf läuft bei jedem Push in der CI, zusammen mit hassfest und der HACS-Prüfung. Die Karte hat ihre eigenen Tests in [ihrem Repository](https://github.com/LuckyTriple7/ha-entity-watchguard-card).
+Beide laufen bei jedem Push in der CI, zusammen mit hassfest und der HACS-Prüfung.
 
 ## Hinweise
 
