@@ -19,6 +19,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
+from homeassistant.util.ulid import ulid_now
 
 from .const import (
     CONF_CHECK_INTERVAL,
@@ -39,7 +40,14 @@ from .const import (
     CONF_STAGE2_MIN_AFFECTED,
     CONF_STARTUP_DELAY,
     DOMAIN,
+    EVENT_ENTITY_RECOVERED,
+    EVENT_RECOVERY_ATTEMPT,
+    EVENT_RECOVERY_RESULT,
     NOTIFICATION_ID_PREFIX,
+    RESULT_FAILED,
+    RESULT_SUCCESS,
+    TRIGGER_AUTOMATIC,
+    TRIGGER_MANUAL,
     effective_options,
 )
 from .filters import Exclusion, build_exclusion
@@ -83,6 +91,10 @@ class Tracked:
     # (given_up) instead of reloading someone's integration forever.
     stage2_rounds: int = 0
     given_up: bool = False
+    # IDs of the recovery operations (stage 1 calls, stage 2 reloads) that
+    # covered this entity, so the "recovered" event can point back to them.
+    operation_ids: list[str] = field(default_factory=list)
+    stages_run: set[int] = field(default_factory=set)
 
 
 @dataclass(slots=True)
@@ -274,6 +286,8 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         for entity_id in set(self._tracked) - seen:
             tracked = self._tracked.pop(entity_id)
             gone.append(_outcome(entity_id, tracked, now))
+            if tracked.operation_ids and self._is_back(entity_id, exclusion):
+                self._async_fire_entity_recovered(entity_id, tracked, now)
 
         # One line per cycle instead of one per entity: an integration going
         # down takes all of its entities with it.
@@ -281,6 +295,81 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.info("Now unavailable (%d): %s", len(appeared), ", ".join(sorted(appeared)))
         if gone:
             _LOGGER.info("Available again (%d): %s", len(gone), ", ".join(sorted(gone)))
+
+    def _is_back(self, entity_id: str, exclusion: Exclusion) -> bool:
+        """Did it really come back, rather than get removed or excluded?"""
+        state = self.hass.states.get(entity_id)
+        return (
+            state is not None
+            and state.state != STATE_UNAVAILABLE
+            and not exclusion.excludes(entity_id)
+        )
+
+    # --- events -----------------------------------------------------------
+    def _integration_domains(self, entity_ids: list[str]) -> list[str]:
+        ent_reg = er.async_get(self.hass)
+        return sorted(
+            {
+                registry_entry.platform
+                for entity_id in entity_ids
+                if (registry_entry := ent_reg.async_get(entity_id)) is not None
+            }
+        )
+
+    @callback
+    def _async_fire_attempt(
+        self,
+        *,
+        operation_id: str,
+        stage: int,
+        trigger: str,
+        now: datetime,
+        entity_ids: list[str],
+        config_entry: ConfigEntry | None = None,
+    ) -> None:
+        """One event per recovery operation that actually ran."""
+        self.hass.bus.async_fire(
+            EVENT_RECOVERY_ATTEMPT,
+            {
+                "watchguard_entry_id": self.entry.entry_id,
+                "operation_id": operation_id,
+                "stage": stage,
+                "trigger": trigger,
+                "timestamp": now.isoformat(),
+                "entity_ids": sorted(entity_ids),
+                "config_entry_id": config_entry.entry_id if config_entry else None,
+                "config_entry_title": config_entry.title if config_entry else None,
+                "integration_domain": config_entry.domain if config_entry else None,
+                "integration_domains": (
+                    [config_entry.domain]
+                    if config_entry
+                    else self._integration_domains(entity_ids)
+                ),
+            },
+        )
+
+    @callback
+    def _async_fire_entity_recovered(
+        self, entity_id: str, tracked: Tracked, now: datetime
+    ) -> None:
+        """An entity we ran recovery for is available again."""
+        self.hass.bus.async_fire(
+            EVENT_ENTITY_RECOVERED,
+            {
+                "watchguard_entry_id": self.entry.entry_id,
+                "entity_id": entity_id,
+                "name": tracked.name,
+                "unavailable_since": tracked.first_unavailable.isoformat(),
+                "timestamp": now.isoformat(),
+                "duration_seconds": round((now - tracked.first_unavailable).total_seconds()),
+                "attempts": tracked.attempts,
+                # Only stages that actually ran: stage1_at / stage2_at are also
+                # set when a stage is skipped (push integration, hub threshold).
+                "stages": sorted(tracked.stages_run),
+                "operation_ids": list(tracked.operation_ids),
+                "last_operation_id": tracked.operation_ids[-1],
+            },
+        )
 
     def _build_data(self, now: datetime) -> dict:
         if self._skip_grace_once:
@@ -394,9 +483,15 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                 pollable += members
         return pollable, push
 
-    async def async_stage1(self, entity_ids: list[str], now: datetime | None = None) -> None:
+    async def async_stage1(
+        self,
+        entity_ids: list[str],
+        now: datetime | None = None,
+        trigger: str = TRIGGER_AUTOMATIC,
+    ) -> None:
         """Stage 1: ask HA to poll the entities again."""
         now = now or dt_util.utcnow()
+        operation_id = ulid_now()
         _LOGGER.info(
             "Stage 1 (update_entity) for %d entities: %s",
             len(entity_ids),
@@ -406,13 +501,27 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             if (tracked := self._tracked.get(entity_id)) is not None:
                 tracked.stage1_at = now
                 tracked.attempts += 1
+                tracked.operation_ids.append(operation_id)
+                tracked.stages_run.add(1)
         self.last_recovery = now
+        self._async_fire_attempt(
+            operation_id=operation_id,
+            stage=1,
+            trigger=trigger,
+            now=now,
+            entity_ids=entity_ids,
+        )
         # Not blocking: a slow integration must not stall the scan cycle.
         await self.hass.services.async_call(
             "homeassistant", "update_entity", {"entity_id": entity_ids}, blocking=False
         )
 
-    async def async_stage2(self, entity_ids: list[str], now: datetime | None = None) -> None:
+    async def async_stage2(
+        self,
+        entity_ids: list[str],
+        now: datetime | None = None,
+        trigger: str = TRIGGER_AUTOMATIC,
+    ) -> None:
         """Stage 2: reload the config entry each entity belongs to."""
         now = now or dt_util.utcnow()
         ent_reg = er.async_get(self.hass)
@@ -470,15 +579,26 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             self._reloaded_at[config_entry_id] = now
             self.last_recovery = now
             reloads += 1
+            operation_id = ulid_now()
             for entity_id in affected:
                 if (tracked := self._tracked.get(entity_id)) is not None:
                     tracked.stage2_at = now
                     tracked.attempts += 1
                     tracked.stage2_rounds += 1
+                    tracked.operation_ids.append(operation_id)
+                    tracked.stages_run.add(2)
                     self._async_check_give_up(entity_id, tracked)
+            self._async_fire_attempt(
+                operation_id=operation_id,
+                stage=2,
+                trigger=trigger,
+                now=now,
+                entity_ids=affected,
+                config_entry=target,
+            )
             self.entry.async_create_background_task(
                 self.hass,
-                self._async_reload(config_entry_id, target.title),
+                self._async_reload(target, operation_id, trigger),
                 f"{DOMAIN}_reload_{config_entry_id}",
             )
 
@@ -531,15 +651,44 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             tracked.stage2_rounds,
         )
 
-    async def _async_reload(self, config_entry_id: str, title: str) -> None:
+    async def _async_reload(
+        self, target: ConfigEntry, operation_id: str, trigger: str
+    ) -> None:
         """Reload wrapper — a failing reload must surface as our error, not as
         a bare "Task exception was never retrieved" from the event loop."""
+        title = target.title
+        error: str | None = None
         try:
-            await self.hass.config_entries.async_reload(config_entry_id)
-        except Exception:  # noqa: BLE001 - background task, log everything
+            reloaded = await self.hass.config_entries.async_reload(target.entry_id)
+        except Exception as err:  # noqa: BLE001 - background task, log everything
             _LOGGER.exception("Stage 2: reloading config entry %s failed", title)
+            error = str(err) or type(err).__name__
         else:
-            _LOGGER.debug("Stage 2: reload of config entry %s finished", title)
+            if reloaded is False:
+                # async_reload reports a failed setup by returning False
+                # rather than raising.
+                _LOGGER.warning(
+                    "Stage 2: config entry %s reloaded but did not set up again", title
+                )
+                error = "setup failed"
+            else:
+                _LOGGER.debug("Stage 2: reload of config entry %s finished", title)
+
+        self.hass.bus.async_fire(
+            EVENT_RECOVERY_RESULT,
+            {
+                "watchguard_entry_id": self.entry.entry_id,
+                "operation_id": operation_id,
+                "stage": 2,
+                "trigger": trigger,
+                "timestamp": dt_util.utcnow().isoformat(),
+                "config_entry_id": target.entry_id,
+                "config_entry_title": title,
+                "integration_domain": target.domain,
+                "result": RESULT_FAILED if error else RESULT_SUCCESS,
+                "error": error,
+            },
+        )
 
     async def async_recover_now(
         self,
@@ -560,9 +709,9 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.debug("recover_now: nothing unavailable matches the request")
             return
 
-        await self.async_stage1(selected, now)
+        await self.async_stage1(selected, now, trigger=TRIGGER_MANUAL)
         if escalate:
-            await self.async_stage2(selected, now)
+            await self.async_stage2(selected, now, trigger=TRIGGER_MANUAL)
         await self.async_request_refresh()
         self._async_schedule_recovery_followups()
 

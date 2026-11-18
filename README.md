@@ -16,6 +16,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - Exceptions by **label**, **entity**, **device**, **area**, **integration** and **regex pattern** on the entity ID
 - Escalating recovery: stage 1 re-polls the entity (`homeassistant.update_entity`), stage 2 reloads the config entry the entity belongs to. Stage 2 repeats on a slow interval and gives up after a configurable number of attempts
 - Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …), where re-polling cannot achieve anything
+- **Events** for every recovery operation, its outcome and every entity that came back afterwards — for recovery statistics with automations and the recorder ([Events](#events))
 - Startup grace period: after a Home Assistant restart the integration stays quiet for a configurable time, because entities need a few minutes to come up
 - Three reporting channels, each switchable: **persistent notifications** (one per domain, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
 - **Check now** / **Recover now** buttons for everything you don't want to wait for
@@ -133,6 +134,34 @@ The entity lists are capped at 50 entries (`truncated: true` tells you there wer
 
 - `entity_watchguard.recover_now` — recover right now, ignoring the configured delays. Optional `domain`, `entity_id`, and `escalate: true` to also run stage 2.
 - `entity_watchguard.clear_notifications` — dismiss all notifications created by this integration.
+
+## Events
+
+Every recovery operation is announced on the Home Assistant event bus, so recovery history can be recorded, counted and charted with standard tools (automations, counters, `history_stats`, the recorder) — independent of the outage records, which Watchguard drops as soon as an entity is back, and across reloads and restarts. Nothing to configure.
+
+| Event | When | Data |
+|---|---|---|
+| `entity_watchguard_recovery_attempt` | A recovery operation actually ran: one stage 1 `update_entity` call (covering all its entities), or one stage 2 config entry reload. Skipped operations (push integration, cooldown, hub threshold, entry not loaded) fire nothing | `operation_id`, `stage` (1/2), `trigger` (`automatic`/`manual`), `timestamp`, `entity_ids`, `config_entry_id`, `config_entry_title`, `integration_domain` (stage 2 only, otherwise `null`), `integration_domains` (integrations of the affected entities), `watchguard_entry_id` |
+| `entity_watchguard_recovery_result` | A stage 2 reload finished. Stage 1 has no result: `update_entity` is fire-and-forget | `operation_id`, `stage`, `trigger`, `timestamp`, `config_entry_id`, `config_entry_title`, `integration_domain`, `result` (`success`/`failed`), `error`, `watchguard_entry_id` |
+| `entity_watchguard_entity_recovered` | An entity Watchguard ran at least one operation for is available again (not fired for entities that came back on their own, or were removed or excluded) | `entity_id`, `name`, `unavailable_since`, `timestamp`, `duration_seconds`, `attempts`, `stages` (stages that actually ran), `operation_ids`, `last_operation_id`, `watchguard_entry_id` |
+
+`operation_id` ties an attempt to its result and to the entities that came back after it. `trigger` is `manual` for the *Recover now* button and the `recover_now` service.
+
+Example — count stage 2 reloads in a counter helper:
+
+```yaml
+automation:
+  - alias: Count Watchguard stage 2 reloads
+    triggers:
+      - trigger: event
+        event_type: entity_watchguard_recovery_attempt
+        event_data:
+          stage: 2
+    actions:
+      - action: counter.increment
+        target:
+          entity_id: counter.watchguard_stage2
+```
 
 ## Logging
 

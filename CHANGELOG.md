@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-11-18
+### Added
+- **Recovery events on the Home Assistant event bus** (#4), so recovery history can be recorded and charted with standard tools, independent of Watchguard's outage records and across restarts:
+  - `entity_watchguard_recovery_attempt` — one per recovery operation that actually ran: a stage 1 `update_entity` call or a stage 2 config entry reload. Carries `operation_id`, `stage`, `trigger` (`automatic`/`manual`), `timestamp`, `entity_ids`, and for stage 2 the reloaded `config_entry_id`, its title and `integration_domain`. Skipped or merely evaluated operations fire nothing
+  - `entity_watchguard_recovery_result` — the outcome of a stage 2 reload (`success`/`failed`, with `error`), linked by `operation_id`
+  - `entity_watchguard_entity_recovered` — an entity Watchguard ran recovery for is available again, with outage duration, attempts, the stages that actually ran and the `operation_ids` involved
+- A stage 2 reload that completes but leaves the config entry not set up (Home Assistant returns `False` instead of raising) is now logged as a warning and reported as `failed`
+
+### Notes
+- Backward compatible: recovery behaviour, entities and options are unchanged
+
 ## [1.1.1] - 2026-10-22
 ### Fixed
 - The startup grace period was armed from a worker thread instead of the event loop: the callback passed to `async_at_started` was a plain function, which Home Assistant runs in the executor. It could race the first refresh, so right after setup the integration could briefly still count as warming up. It is a `@callback` now and runs in order on the event loop

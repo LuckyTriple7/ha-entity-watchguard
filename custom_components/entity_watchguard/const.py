@@ -98,6 +98,19 @@ SERVICE_CLEAR_NOTIFICATIONS = "clear_notifications"
 ATTR_DOMAIN = "domain"
 ATTR_ESCALATE = "escalate"
 
+# --- events -------------------------------------------------------------
+# Fired on the HA event bus so recovery history can be recorded and charted
+# with standard tools, independent of the (short-lived) outage records.
+EVENT_RECOVERY_ATTEMPT = f"{DOMAIN}_recovery_attempt"
+EVENT_RECOVERY_RESULT = f"{DOMAIN}_recovery_result"
+EVENT_ENTITY_RECOVERED = f"{DOMAIN}_entity_recovered"
+
+TRIGGER_AUTOMATIC = "automatic"
+TRIGGER_MANUAL = "manual"
+
+RESULT_SUCCESS = "success"
+RESULT_FAILED = "failed"
+
 # --- misc ---------------------------------------------------------------
 NOTIFICATION_ID_PREFIX = f"{DOMAIN}_"
 

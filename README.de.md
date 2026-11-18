@@ -16,6 +16,7 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 - Ausnahmen per **Label**, **Entity**, **Gerät**, **Bereich**, **Integration** und **Regex-Muster** auf die Entity-ID
 - Eskalierende Wiederherstellung: Stufe 1 fragt die Entity erneut ab (`homeassistant.update_entity`), Stufe 2 lädt den Config-Entry der zugehörigen Integration neu. Stufe 2 wiederholt sich in großem Abstand und gibt nach einer einstellbaren Zahl von Versuchen auf
 - Stufe 1 wird bei Push-Integrationen (MQTT, ZHA, ESPHome …) automatisch übersprungen — erneutes Abfragen kann dort nichts bewirken
+- **Events** für jede Wiederherstellungsaktion, ihr Ergebnis und jede danach zurückgekehrte Entity – für Recovery-Statistiken mit Automationen und Recorder ([Events](#events))
 - Startkarenz: Nach einem Neustart von Home Assistant bleibt die Integration eine einstellbare Zeit still, weil Entities einige Minuten brauchen, bis sie da sind
 - Drei Meldewege, jeder einzeln abschaltbar: **persistente Benachrichtigungen** (eine pro Domain, aktualisiert sich selbst, verschwindet automatisch, Entities pro Gerät gruppiert), **Reparatur-Hinweise** (pro Domain ignorierbar) und ein optionaler **Notify-Dienst** für Push aufs Handy
 - Buttons **Jetzt prüfen** / **Wiederherstellen** für alles, worauf du nicht warten willst
@@ -133,6 +134,34 @@ Die Entity-Listen sind bei 50 Einträgen gekappt (`truncated: true` zeigt, dass 
 
 - `entity_watchguard.recover_now` — sofort wiederherstellen, unabhängig von den eingestellten Wartezeiten. Optional `domain`, `entity_id` und `escalate: true`, um auch Stufe 2 auszuführen.
 - `entity_watchguard.clear_notifications` — verwirft alle Benachrichtigungen und Reparatur-Hinweise dieser Integration.
+
+## Events
+
+Jede Wiederherstellungsaktion wird auf dem Event-Bus von Home Assistant gemeldet. So lässt sich die Recovery-Historie mit Bordmitteln aufzeichnen, zählen und als Diagramm darstellen (Automationen, Zähler, `history_stats`, Recorder) – unabhängig von den Ausfall-Datensätzen, die Watchguard verwirft, sobald eine Entity wieder da ist, und über Reloads und Neustarts hinweg. Es gibt nichts einzustellen.
+
+| Event | Wann | Daten |
+|---|---|---|
+| `entity_watchguard_recovery_attempt` | Eine Wiederherstellung wurde tatsächlich ausgeführt: ein `update_entity`-Aufruf der Stufe 1 (für alle betroffenen Entities) oder ein Config-Entry-Reload der Stufe 2. Übersprungene Aktionen (Push-Integration, Abkühlzeit, Hub-Schwelle, Eintrag nicht geladen) lösen nichts aus | `operation_id`, `stage` (1/2), `trigger` (`automatic`/`manual`), `timestamp`, `entity_ids`, `config_entry_id`, `config_entry_title`, `integration_domain` (nur Stufe 2, sonst `null`), `integration_domains` (Integrationen der betroffenen Entities), `watchguard_entry_id` |
+| `entity_watchguard_recovery_result` | Ein Reload der Stufe 2 ist fertig. Stufe 1 hat kein Ergebnis, `update_entity` wird ohne Rückmeldung abgeschickt | `operation_id`, `stage`, `trigger`, `timestamp`, `config_entry_id`, `config_entry_title`, `integration_domain`, `result` (`success`/`failed`), `error`, `watchguard_entry_id` |
+| `entity_watchguard_entity_recovered` | Eine Entity, für die Watchguard mindestens eine Aktion ausgeführt hat, ist wieder verfügbar (nicht bei Entities, die von selbst zurückkamen, entfernt oder ausgeschlossen wurden) | `entity_id`, `name`, `unavailable_since`, `timestamp`, `duration_seconds`, `attempts`, `stages` (tatsächlich ausgeführte Stufen), `operation_ids`, `last_operation_id`, `watchguard_entry_id` |
+
+`operation_id` verbindet einen Versuch mit seinem Ergebnis und mit den Entities, die danach zurückkamen. `trigger` ist `manual` beim Button *Jetzt wiederherstellen* und beim Dienst `recover_now`.
+
+Beispiel – Reloads der Stufe 2 in einem Zähler-Helfer mitzählen:
+
+```yaml
+automation:
+  - alias: Watchguard-Reloads Stufe 2 zählen
+    triggers:
+      - trigger: event
+        event_type: entity_watchguard_recovery_attempt
+        event_data:
+          stage: 2
+    actions:
+      - action: counter.increment
+        target:
+          entity_id: counter.watchguard_stufe2
+```
 
 ## Protokollierung
 
