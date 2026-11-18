@@ -1,6 +1,6 @@
 # Entity Watchguard
 
-[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Marketplace](https://img.shields.io/badge/Marketplace%20%7C%20HACS-Custom-orange.svg)](https://www.hacs.xyz/docs/marketplace/)
 [![Version](https://img.shields.io/github/v/release/LuckyTriple7/ha-entity-watchguard)](https://github.com/LuckyTriple7/ha-entity-watchguard/releases)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/luckytriple7)
@@ -78,9 +78,19 @@ After an update, reload the browser once (Ctrl+F5 / Cmd+Shift+R).
 
 ### Coming from the standalone card (1.0.x)
 
-For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard Card*. It is retired — remove it in HACS (HACS → Dashboard → Entity Watchguard Card → ⋮ → **Remove**). Until you do, both copies are loaded; that is harmless, only the first one defines the card, and the log reminds you. Your card configuration needs no changes.
+For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard Card*. It is retired — remove it under **Settings → Marketplace** (Home Assistant 2026.11 and newer) or in HACS → Dashboard → Entity Watchguard Card → ⋮ → **Remove** (2026.10 and older). Until you do, both copies are loaded; that is harmless, only the first one defines the card, and the log reminds you. Your card configuration needs no changes.
 
-## Installation via HACS
+## Installation via the Marketplace
+
+**Home Assistant 2026.11 and newer** — HACS is built in as the **Marketplace**:
+
+1. Open **Settings → Marketplace**
+2. Select **Add from link** (top right)
+3. Enter `LuckyTriple7/ha-entity-watchguard` under **GitHub link** → **Add**
+4. On the repository page select **Install** and confirm
+5. Restart Home Assistant if the Marketplace asks for it
+
+**Home Assistant 2026.10 and older** — via HACS:
 
 1. Open HACS → **Integrations** → Menu (⋮) → **Custom repositories**
 2. Enter URL: `https://github.com/LuckyTriple7/ha-entity-watchguard`

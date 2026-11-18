@@ -1,6 +1,6 @@
 # Entity Watchguard
 
-[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Marketplace](https://img.shields.io/badge/Marketplace%20%7C%20HACS-Custom-orange.svg)](https://www.hacs.xyz/docs/marketplace/)
 [![Version](https://img.shields.io/github/v/release/LuckyTriple7/ha-entity-watchguard)](https://github.com/LuckyTriple7/ha-entity-watchguard/releases)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/luckytriple7)
@@ -78,9 +78,19 @@ Nach einem Update den Browser einmal neu laden (Strg+F5 / Cmd+Shift+R).
 
 ### Umstieg von der eigenständigen Karte (1.0.x)
 
-In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard Card*. Das ist eingestellt — entferne es in HACS (Dashboard → Entity Watchguard Card → Menü ⋮). Bis dahin werden beide Kopien geladen; das ist harmlos, nur die erste definiert die Karte, und das Log erinnert dich daran. An deiner Kartenkonfiguration ändert sich nichts.
+In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard Card*. Das ist eingestellt — entferne es unter **Einstellungen → Marketplace** (Home Assistant 2026.11 und neuer) bzw. in HACS → Dashboard → Entity Watchguard Card → Menü ⋮ (2026.10 und älter). Bis dahin werden beide Kopien geladen; das ist harmlos, nur die erste definiert die Karte, und das Log erinnert dich daran. An deiner Kartenkonfiguration ändert sich nichts.
 
-## Installation über HACS
+## Installation über den Marketplace
+
+**Home Assistant 2026.11 und neuer** – HACS ist dort als **Marketplace** eingebaut:
+
+1. **Einstellungen → Marketplace** öffnen
+2. Oben rechts **Add from link** wählen
+3. Unter **GitHub link** `LuckyTriple7/ha-entity-watchguard` eintragen → **Add**
+4. Auf der Repository-Seite **Install** wählen und bestätigen
+5. Home Assistant neu starten, falls der Marketplace danach fragt
+
+**Home Assistant 2026.10 und älter** – über HACS:
 
 1. HACS öffnen → **Integrationen** → Menü (⋮) → **Benutzerdefinierte Repositories**
 2. URL eintragen: `https://github.com/LuckyTriple7/ha-entity-watchguard`

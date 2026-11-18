@@ -115,8 +115,9 @@ async def _async_sync_card_resource(hass: HomeAssistant) -> None:
         if STANDALONE_CARD_MARKER in str(item.get("url", "")):
             _LOGGER.warning(
                 "The Entity Watchguard card ships with the integration again. The standalone "
-                "'Entity Watchguard Card' from HACS (%s) is no longer needed — remove it in "
-                "HACS so the dashboard doesn't load the card twice",
+                "'Entity Watchguard Card' (%s) is no longer needed — remove it under "
+                "Settings → Marketplace (HACS on Home Assistant 2026.10 and older) so the "
+                "dashboard doesn't load the card twice",
                 item["url"],
             )
 

@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-11-18
+### Changed
+- Since Home Assistant 2026.11, HACS is built in as the **Marketplace**. The installation instructions now cover both ways (Settings → Marketplace on 2026.11 and newer, HACS on 2026.10 and older), and the log hint about the retired standalone card points to the Marketplace
+
 ## [1.2.0] - 2026-11-18
 ### Added
 - **Recovery events on the Home Assistant event bus** (#4), so recovery history can be recorded and charted with standard tools, independent of Watchguard's outage records and across restarts:
