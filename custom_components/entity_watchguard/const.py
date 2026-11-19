@@ -114,6 +114,11 @@ RESULT_FAILED = "failed"
 # --- misc ---------------------------------------------------------------
 NOTIFICATION_ID_PREFIX = f"{DOMAIN}_"
 
+# A single integration going down can take hundreds of entities with it, and
+# the full list would otherwise be written to the state machine (and the
+# database) on every scan. Cap what's exposed; `count` stays exact.
+MAX_LISTED = 50
+
 DEFAULTS: dict[str, object] = {
     CONF_MONITORED_DOMAINS: DEFAULT_MONITORED_DOMAINS,
     CONF_STARTUP_DELAY: DEFAULT_STARTUP_DELAY,

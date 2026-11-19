@@ -12,6 +12,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 ## Features
 
 - One `problem` binary sensor per watched domain (`light`, `switch`, `sensor`, `binary_sensor`, …), listing the affected entities in its attributes, plus one overall problem sensor
+- Counters for **unavailable entities** and **unavailable devices** — a dead device with a dozen entities counts once on the device sensor, which lists the device names
 - Pick the watched domains in the UI — the picker offers every domain that exists in your instance
 - Exceptions by **label**, **entity**, **device**, **area**, **integration** and **regex pattern** on the entity ID
 - Escalating recovery: stage 1 re-polls the entity (`homeassistant.update_entity`), stage 2 reloads the config entry the entity belongs to. Stage 2 repeats on a slow interval and gives up after a configurable number of attempts
@@ -132,13 +133,14 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 | `binary_sensor.entity_watchguard_<domain>` | problem | ON when the domain has unavailable entities. Attributes: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `given_up_entities`, `details` (per-entity rows: `entity_id`, `name`, `since`, `attempts`, `given_up`), `status`, `truncated` |
 | `binary_sensor.entity_watchguard_problem` | problem | ON when any watched domain has a problem. Attributes: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | count | Total across all watched domains, `per_domain` breakdown in the attributes |
+| `sensor.entity_watchguard_unavailable_devices` | count | Devices with at least one unavailable entity — a dead device with twelve entities counts once. Attributes: `unavailable_devices` (device names, one per device), `fully_unavailable` (devices with every watched entity down), `entities_without_device` (unavailable entities that belong to no device, e.g. templates), `details` (per-device rows: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`), `truncated`, `warming_up` |
 | `sensor.entity_watchguard_last_recovery_attempt` | timestamp | Diagnostic |
 | `button.entity_watchguard_check_now` | button | Scan immediately instead of waiting for the check interval — also ends the startup grace period early |
 | `button.entity_watchguard_recover_now` | button | Run stage 1 for everything currently unavailable, ignoring the delays |
 
 During the startup grace period every sensor stays `off` and reports `status: warming_up`.
 
-The entity lists are capped at 50 entries (`truncated: true` tells you there were more; `count` always stays exact) and are excluded from the recorder, so a large outage doesn't write the same long list into the database on every scan.
+The entity and device lists are capped at 50 entries (`truncated: true` tells you there were more; `count` and the sensor states always stay exact) and are excluded from the recorder, so a large outage doesn't write the same long list into the database on every scan.
 
 ## Services
 

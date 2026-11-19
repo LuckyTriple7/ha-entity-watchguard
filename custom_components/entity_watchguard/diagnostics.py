@@ -31,4 +31,13 @@ async def async_get_config_entry_diagnostics(
             domain: report.count
             for domain, report in (coordinator.data or {}).get("domains", {}).items()
         },
+        "devices": {
+            report.device_id: {
+                "entity_ids": report.entity_ids,
+                "given_up": report.given_up,
+                "fully_unavailable": report.fully_unavailable,
+            }
+            for report in (coordinator.data or {}).get("devices", [])
+        },
+        "entities_without_device": (coordinator.data or {}).get("entities_without_device", 0),
     }

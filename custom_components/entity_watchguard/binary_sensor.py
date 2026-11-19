@@ -10,18 +10,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, MAX_LISTED
 from .coordinator import DomainReport, WatchguardCoordinator
 from .entity import WatchguardEntity
 
 STATUS_WARMING_UP = "warming_up"
 STATUS_OK = "ok"
 STATUS_PROBLEM = "problem"
-
-# A single integration going down can take hundreds of entities with it, and
-# the full list would otherwise be written to the state machine (and the
-# database) on every scan. Cap what's exposed; `count` stays exact.
-MAX_LISTED = 50
 
 
 def _capped(values: list[str]) -> list[str]:
