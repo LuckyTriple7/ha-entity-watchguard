@@ -17,3 +17,6 @@ async def test_diagnostics_report_tracked_entities(hass, setup_watchguard):
     assert data["tracked"]["light.kitchen"]["attempts"] == 0
     assert data["tracked"]["light.kitchen"]["first_unavailable"] is not None
     assert data["options"]["monitored_domains"] == ["light", "switch"]
+    # light.kitchen has no device: counted, but not listed as a device.
+    assert data["devices"] == {}
+    assert data["entities_without_device"] == 1

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-11-19
+### Added
+- **New sensor `sensor.entity_watchguard_unavailable_devices`** (#5): counts the devices that have at least one unavailable entity past the grace period. A dead Shelly with twelve entities counts once, so the number says how much hardware is actually affected. Unit `devices`, state class `measurement` for long-term statistics. Attributes:
+  - `unavailable_devices` — device names, one entry per device, sorted (the user-given name wins). Two devices with the same name appear twice, because they are counted by device, not by name
+  - `fully_unavailable` — how many of these devices have *every* watched entity unavailable, not just some. Entities in unwatched domains, excluded entities and disabled entities don't count
+  - `entities_without_device` — unavailable entities that belong to no device (templates, helpers, groups). They count as entities but not as devices
+  - `details` — one row per device: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`
+  - `truncated`, `warming_up`
+- Diagnostics list the affected devices
+
+### Notes
+- The same grace period and exclusions apply as for the entity count. The lists are capped at 50 entries and kept out of the recorder, like the entity lists
+- Backward compatible: existing entities, attributes and options are unchanged
+
 ## [1.2.1] - 2026-11-18
 ### Changed
 - Since Home Assistant 2026.11, HACS is built in as the **Marketplace**. The installation instructions now cover both ways (Settings → Marketplace on 2026.11 and newer, HACS on 2026.10 and older), and the log hint about the retired standalone card points to the Marketplace

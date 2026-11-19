@@ -1,4 +1,4 @@
-"""Diagnostic sensors: total unavailable count and last recovery attempt."""
+"""Sensors: unavailable entities and devices, last recovery attempt."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,9 +12,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .coordinator import DomainReport, WatchguardCoordinator
+from .const import DOMAIN, MAX_LISTED
+from .coordinator import DeviceReport, DomainReport, WatchguardCoordinator
 from .entity import WatchguardEntity
 
 
@@ -27,6 +28,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             WatchguardTotalSensor(coordinator, entry),
+            WatchguardDeviceSensor(coordinator, entry),
             WatchguardLastRecoverySensor(coordinator, entry),
         ]
     )
@@ -54,6 +56,57 @@ class WatchguardTotalSensor(WatchguardEntity, SensorEntity):
         return {
             "warming_up": self.coordinator.data["warming_up"],
             "per_domain": {domain: report.count for domain, report in domains.items()},
+        }
+
+
+class WatchguardDeviceSensor(WatchguardEntity, SensorEntity):
+    """Devices with at least one unavailable entity.
+
+    A dead Shelly takes a dozen entities with it; counting devices tells how
+    much hardware is actually affected.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "devices"
+    _attr_icon = "mdi:devices"
+    _unrecorded_attributes = frozenset({"unavailable_devices", "details"})
+
+    def __init__(self, coordinator: WatchguardCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_unavailable_devices"
+        self._attr_name = "Unavailable devices"
+
+    @property
+    def _devices(self) -> list[DeviceReport]:
+        return (self.coordinator.data or {}).get("devices", [])
+
+    @property
+    def native_value(self) -> int:
+        return len(self._devices)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if not self.coordinator.data:
+            return {}
+        devices = self._devices
+        return {
+            "warming_up": self.coordinator.data["warming_up"],
+            "unavailable_devices": [device.name for device in devices[:MAX_LISTED]],
+            "fully_unavailable": sum(1 for device in devices if device.fully_unavailable),
+            "entities_without_device": self.coordinator.data.get("entities_without_device", 0),
+            "details": [
+                {
+                    "device_id": device.device_id,
+                    "name": device.name,
+                    "count": len(device.entity_ids),
+                    "entity_ids": device.entity_ids[:MAX_LISTED],
+                    "since": dt_util.as_local(device.since).isoformat() if device.since else None,
+                    "given_up": device.given_up,
+                    "fully_unavailable": device.fully_unavailable,
+                }
+                for device in devices[:MAX_LISTED]
+            ],
+            "truncated": len(devices) > MAX_LISTED,
         }
 
 

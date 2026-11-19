@@ -151,6 +151,20 @@ class DomainReport:
         return len(self.entity_ids)
 
 
+@dataclass(slots=True)
+class DeviceReport:
+    """One device with at least one unavailable entity past the grace period."""
+
+    device_id: str
+    name: str
+    entity_ids: list[str] = field(default_factory=list)
+    since: datetime | None = None
+    # Every reported entity of the device has been given up on.
+    given_up: bool = False
+    # Every watched entity of the device is unavailable, not just some of them.
+    fully_unavailable: bool = False
+
+
 class WatchguardCoordinator(DataUpdateCoordinator[dict]):
     """Polls hass.states for unavailable entities and tries to bring them back."""
 
@@ -257,7 +271,14 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             # Keep _tracked empty so timers start from the moment we go live,
             # not from whenever the entity first showed up as unavailable.
             self._tracked.clear()
-            return {"warming_up": True, "domains": {}, "total": 0, "last_recovery": None}
+            return {
+                "warming_up": True,
+                "domains": {},
+                "total": 0,
+                "devices": [],
+                "entities_without_device": 0,
+                "last_recovery": None,
+            }
 
         self._async_scan(now)
         await self._async_recover(now)
@@ -400,12 +421,62 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             if report.since is None or tracked.first_unavailable < report.since:
                 report.since = tracked.first_unavailable
 
+        reported = [entity_id for report in domains.values() for entity_id in report.entity_ids]
+        devices, without_device = self._device_reports(reported)
         return {
             "warming_up": False,
             "domains": domains,
-            "total": sum(report.count for report in domains.values()),
+            "total": len(reported),
+            "devices": devices,
+            "entities_without_device": without_device,
             "last_recovery": self.last_recovery,
         }
+
+    def _device_reports(self, entity_ids: list[str]) -> tuple[list[DeviceReport], int]:
+        """Group reported entities by their device.
+
+        Entities without a device (templates, helpers, groups) are only counted,
+        so the device total and the entity total can still be reconciled.
+        """
+        ent_reg = er.async_get(self.hass)
+        dev_reg = dr.async_get(self.hass)
+        by_device: dict[str, list[str]] = {}
+        without_device = 0
+        for entity_id in entity_ids:
+            registry_entry = ent_reg.async_get(entity_id)
+            device_id = registry_entry.device_id if registry_entry else None
+            if device_id is None or dev_reg.async_get(device_id) is None:
+                without_device += 1
+                continue
+            by_device.setdefault(device_id, []).append(entity_id)
+
+        monitored = set(self.monitored_domains)
+        exclusion = self._exclusion or build_exclusion(self.hass, self.options)
+        devices: list[DeviceReport] = []
+        for device_id, members in by_device.items():
+            device = dev_reg.async_get(device_id)
+            tracked = [self._tracked[entity_id] for entity_id in members]
+            # What this device would report if all of it were down: its enabled
+            # entities in a watched domain that aren't excluded and have a state.
+            watched = {
+                entry.entity_id
+                for entry in er.async_entries_for_device(ent_reg, device_id)
+                if entry.domain in monitored
+                and not exclusion.excludes(entry.entity_id)
+                and self.hass.states.get(entry.entity_id) is not None
+            }
+            devices.append(
+                DeviceReport(
+                    device_id=device_id,
+                    name=device.name_by_user or device.name or device_id,
+                    entity_ids=members,
+                    since=min(item.first_unavailable for item in tracked),
+                    given_up=all(item.given_up for item in tracked),
+                    fully_unavailable=watched <= set(members),
+                )
+            )
+        devices.sort(key=lambda report: (report.name.casefold(), report.device_id))
+        return devices, without_device
 
     # --- recovery -------------------------------------------------------
     async def _async_recover(self, now: datetime) -> None:
