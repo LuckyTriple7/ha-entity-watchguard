@@ -9,6 +9,11 @@ from .const import DOMAIN
 from .coordinator import WatchguardCoordinator
 
 
+def pretty_domain(domain: str) -> str:
+    """`binary_sensor` -> `Binary Sensor`, used in the per-domain entity names."""
+    return domain.replace("_", " ").title()
+
+
 class WatchguardEntity(CoordinatorEntity[WatchguardCoordinator]):
     """All entities hang off one service device."""
 

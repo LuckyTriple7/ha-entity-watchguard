@@ -16,7 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, MAX_LISTED
 from .coordinator import DeviceReport, DomainReport, WatchguardCoordinator
-from .entity import WatchguardEntity
+from .entity import WatchguardEntity, pretty_domain
 
 
 async def async_setup_entry(
@@ -30,6 +30,10 @@ async def async_setup_entry(
             WatchguardTotalSensor(coordinator, entry),
             WatchguardDeviceSensor(coordinator, entry),
             WatchguardLastRecoverySensor(coordinator, entry),
+            *(
+                WatchguardDomainCountSensor(coordinator, entry, domain)
+                for domain in coordinator.monitored_domains
+            ),
         ]
     )
 
@@ -57,6 +61,38 @@ class WatchguardTotalSensor(WatchguardEntity, SensorEntity):
             "warming_up": self.coordinator.data["warming_up"],
             "per_domain": {domain: report.count for domain, report in domains.items()},
         }
+
+
+class WatchguardDomainCountSensor(WatchguardEntity, SensorEntity):
+    """Number of unavailable entities in one domain.
+
+    The per-domain binary sensor only says OK/Problem; this one shows how many,
+    straight in the state, for tiles, history graphs and long-term statistics.
+    Disabled by default — with many watched domains it would add a lot of
+    entities that most people never look at.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "entities"
+    _attr_icon = "mdi:link-variant-off"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self, coordinator: WatchguardCoordinator, entry: ConfigEntry, domain: str
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self._domain = domain
+        self._attr_unique_id = f"{entry.entry_id}_{domain}_unavailable"
+        self._attr_name = f"{pretty_domain(domain)} unavailable"
+
+    @property
+    def native_value(self) -> int:
+        report = (self.coordinator.data or {}).get("domains", {}).get(self._domain)
+        return report.count if report else 0
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"domain": self._domain, "warming_up": self._warming_up}
 
 
 class WatchguardDeviceSensor(WatchguardEntity, SensorEntity):
