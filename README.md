@@ -15,7 +15,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - Counters for **unavailable entities** and **unavailable devices** — a dead device with a dozen entities counts once on the device sensor, which lists the device names and which of them are completely down
 - Optional **count sensor per domain** (disabled by default) that shows the number of unavailable entities directly as its state
 - Pick the watched domains in the UI — the picker offers every domain that exists in your instance
-- Exceptions by **label**, **entity**, **device**, **area**, **integration** and **regex pattern** on the entity ID
+- Exceptions by **label**, **entity**, **device**, **area**, **integration**, **entity category** (e.g. diagnostic) and **regex pattern** on the entity ID
 - Escalating recovery: stage 1 re-polls the entity (`homeassistant.update_entity`), stage 2 reloads the config entry the entity belongs to. Stage 2 repeats on a slow interval and gives up after a configurable number of attempts
 - Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …), where re-polling cannot achieve anything
 - **Events** for every recovery operation, its outcome and every entity that came back afterwards — for recovery statistics with automations and the recorder ([Events](#events))
@@ -120,6 +120,7 @@ For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard 
 | Exceptions | Labels | – | Set on an entity, device or area; e.g. an `offline` label for devices you knowingly powered down |
 | Exceptions | Entities / Devices / Areas | – | Explicit pickers |
 | Exceptions | Integrations | – | Everything provided by that integration, e.g. `shelly`, `mqtt`, `hue` — useful for a whole system you knowingly leave offline |
+| Exceptions | Entity categories | – | **Configuration** and/or **Diagnostic**. Diagnostic entities (signal strength, firmware update, last seen, uptime) often drop out while the device itself works fine. Careful: some integrations, e.g. Shelly or ESPHome, also put their connection status there — excluding Diagnostic hides that too. Excluded entities also don't count when deciding whether a device is *completely* unavailable |
 | Exceptions | Patterns | – | Regex against the entity ID, e.g. `.*_internet_access$` |
 | Notifications | Persistent notifications | on | Self-updating, auto-dismissed. Per domain: one notification per domain, entities of the same device collapsed into one line. Per device: one notification for all domains (see *Report per*) |
 | Notifications | Repair issues | on | Mirrors the same outages into Settings → Repairs, where they can be ignored per domain |
@@ -251,7 +252,7 @@ Both run in CI on every push, alongside hassfest and the HACS validation.
 
 ## Notes
 
-- Entities that are not in the entity registry (YAML/template entities) can only be exempted via **patterns** or the **entity** picker; label/device/area/integration exemptions need a registry entry.
+- Entities that are not in the entity registry (YAML/template entities) can only be exempted via **patterns** or the **entity** picker; label/device/area/integration/category exemptions need a registry entry.
 - Stage 2 never reloads Entity Watchguard's own config entry, skips entries that are not loaded, and honours the cooldown.
 - Push detection reads `iot_class` from the integration's manifest. Anything that can't be resolved is treated as pollable — one harmless service call is cheaper than a missed recovery.
 - **Nothing showing up?** Check the `status` attribute of a domain sensor: `warming_up` means the startup delay is still running (press **Check now** to end it), `ok` with `count: 0` means nothing matched — verify the domain is actually watched and that the entities are `unavailable`, not `unknown`.

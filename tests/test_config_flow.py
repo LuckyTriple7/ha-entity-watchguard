@@ -5,6 +5,7 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.entity_watchguard.const import (
+    CONF_EXCLUDE_ENTITY_CATEGORIES,
     CONF_EXCLUDE_PATTERNS,
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_DELAY,
@@ -141,3 +142,19 @@ async def test_options_notify_grouping(hass, setup_watchguard):
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_NOTIFY_GROUPING] == "device"
+
+
+async def test_options_exclude_entity_categories(hass, setup_watchguard):
+    entry, _ = await setup_watchguard()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "exceptions"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_EXCLUDE_ENTITY_CATEGORIES: ["diagnostic"]}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_EXCLUDE_ENTITY_CATEGORIES] == ["diagnostic"]

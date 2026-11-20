@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from homeassistant.const import EntityCategory
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.entity_watchguard.const import (
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_CATEGORIES,
     CONF_GRACE_PERIOD,
     CONF_STARTUP_DELAY,
 )
@@ -164,3 +166,32 @@ async def test_device_sensor_while_warming_up(hass, setup_watchguard):
     assert sensor.state == "0"
     assert sensor.attributes["warming_up"] is True
     assert sensor.attributes["unavailable_devices"] == []
+
+
+async def test_excluded_diagnostic_entities_are_ignored(hass, setup_watchguard):
+    """A dead device whose diagnostic entity still reports counts as fully down."""
+    device_id = _device(hass, "plug", "Attic Plug", {"switch.attic": "unavailable"})
+    config_entry_id = dr.async_get(hass).async_get(device_id).primary_config_entry
+    registry = er.async_get(hass)
+    for object_id, state in (("attic_rssi", "-70"), ("attic_last_seen", "unavailable")):
+        registry.async_get_or_create(
+            "sensor",
+            "demo",
+            f"plug_{object_id}",
+            suggested_object_id=object_id,
+            config_entry=hass.config_entries.async_get_entry(config_entry_id),
+            device_id=device_id,
+            entity_category=EntityCategory.DIAGNOSTIC,
+        )
+        hass.states.async_set(f"sensor.{object_id}", state)
+
+    await setup_watchguard(
+        ["switch", "sensor"], **{CONF_EXCLUDE_ENTITY_CATEGORIES: ["diagnostic"]}
+    )
+
+    # The unavailable diagnostic entity isn't reported ...
+    assert hass.states.get("sensor.entity_watchguard_unavailable_entities").state == "1"
+    sensor = hass.states.get(SENSOR)
+    # ... and the RSSI entity that still has a value doesn't keep the plug
+    # from counting as completely down.
+    assert sensor.attributes["fully_unavailable_devices"] == ["Attic Plug"]
