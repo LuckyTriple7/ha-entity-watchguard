@@ -20,7 +20,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …), where re-polling cannot achieve anything
 - **Events** for every recovery operation, its outcome and every entity that came back afterwards — for recovery statistics with automations and the recorder ([Events](#events))
 - Startup grace period: after a Home Assistant restart the integration stays quiet for a configurable time, because entities need a few minutes to come up
-- Three reporting channels, each switchable: **persistent notifications** (one per domain, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
+- Three reporting channels, each switchable: **persistent notifications** (per domain or per device, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
 - **Check now** / **Recover now** buttons for everything you don't want to wait for
 - Built-in **dashboard card** with per-domain rows, per-entity outage details and a one-click "ignore this entity" action — registered automatically, nothing to install separately
 - Light on CPU: one in-memory scan per interval (default 60 s), no template rendering and no state-change listeners. Long entity lists are kept out of the recorder
@@ -120,10 +120,11 @@ For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard 
 | Exceptions | Entities / Devices / Areas | – | Explicit pickers |
 | Exceptions | Integrations | – | Everything provided by that integration, e.g. `shelly`, `mqtt`, `hue` — useful for a whole system you knowingly leave offline |
 | Exceptions | Patterns | – | Regex against the entity ID, e.g. `.*_internet_access$` |
-| Notifications | Persistent notifications | on | One per domain, self-updating, auto-dismissed. Entities of the same device are collapsed into one line |
+| Notifications | Persistent notifications | on | Self-updating, auto-dismissed. Per domain: one notification per domain, entities of the same device collapsed into one line. Per device: one notification for all domains (see *Report per*) |
 | Notifications | Repair issues | on | Mirrors the same outages into Settings → Repairs, where they can be ignored per domain |
 | Notifications | Notify after | 900 s | Meant to fire *after* the recovery attempts have failed |
-| Notifications | Notify service | – | Optional, e.g. `notify.mobile_app_phone`. Called only when a domain starts or stops having a problem, never on every check |
+| Notifications | Report per | Domain | What the persistent notification and the notify service report. **Domain**: every unavailable entity, one notification per domain. **Device**: only devices whose watched entities are *all* unavailable — a dead Shelly with entities in three domains is one line instead of three notifications; a device with only a hung firmware-update entity is not reported. Entities that belong to no device (templates, helpers) are listed separately. **Both**: domain and device notifications side by side. Repair issues always stay per domain |
+| Notifications | Notify service | – | Optional, e.g. `notify.mobile_app_phone`. Called only when something goes down or comes back, never on every check. Per device, everything that changed in one check goes into one message, so a power cut that takes out five devices sends one push |
 
 Only one instance is supported — it watches the whole Home Assistant instance.
 
@@ -135,7 +136,7 @@ Only one instance is supported — it watches the whole Home Assistant instance.
 | `sensor.entity_watchguard_<domain>_unavailable` | count | Number of unavailable entities in that domain, as the state — for tiles, history graphs and long-term statistics (unit `entities`, state class `measurement`). **Disabled by default**, enable it per domain under Settings → Devices & services → Entity Watchguard → Entities. Attributes: `domain`, `warming_up` |
 | `binary_sensor.entity_watchguard_problem` | problem | ON when any watched domain has a problem. Attributes: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | count | Total across all watched domains, `per_domain` breakdown in the attributes |
-| `sensor.entity_watchguard_unavailable_devices` | count | Devices with at least one unavailable entity — a dead device with twelve entities counts once. Attributes: `unavailable_devices` (device names, one per device), `fully_unavailable` (devices with every watched entity down), `entities_without_device` (unavailable entities that belong to no device, e.g. templates), `details` (per-device rows: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`), `truncated`, `warming_up` |
+| `sensor.entity_watchguard_unavailable_devices` | count | Devices with at least one unavailable entity — a dead device with twelve entities counts once. Attributes: `unavailable_devices` (device names, one per device), `fully_unavailable` (number of devices with every watched entity down), `fully_unavailable_devices` (their names), `entities_without_device` (unavailable entities that belong to no device, e.g. templates), `details` (per-device rows: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`), `truncated`, `warming_up` |
 | `sensor.entity_watchguard_last_recovery_attempt` | timestamp | Diagnostic |
 | `button.entity_watchguard_check_now` | button | Scan immediately instead of waiting for the check interval — also ends the startup grace period early |
 | `button.entity_watchguard_recover_now` | button | Run stage 1 for everything currently unavailable, ignoring the delays |

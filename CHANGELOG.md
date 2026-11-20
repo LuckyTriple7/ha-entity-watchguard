@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-11-20
+### Added
+- **Notifications per device** (#9): new option *Report per* under Configure → Notifications, with **Domain** (default, as before), **Device** or **Both**. It applies to the persistent notification and the notify service; repair issues always stay per domain
+  - **Device** reports only devices whose watched entities are *all* unavailable, across all domains in one notification (`Entity Watchguard – devices (…)`), one line per device. A dead Shelly with entities in `light`, `switch` and `sensor` is one line instead of three notifications, and a device where only the firmware-update entity hangs is not announced as dead. Partly unavailable devices show up in the domain view, on the sensors and on the card
+  - Unavailable entities that belong to no device (templates, helpers, groups) are listed in their own section, so nothing goes unreported
+  - The notify service gets one message per check for everything that went down, and one "Available again: …" message for what came back — a power cut that takes out five devices sends one push, not five
+  - The notify delay applies per entity: a device is reported once every watched entity of it is past the delay
+- **New attribute `fully_unavailable_devices`** on `sensor.entity_watchguard_unavailable_devices` (#5): the names of the devices whose watched entities are all unavailable, sorted, capped at 50 and kept out of the recorder. `fully_unavailable` stays the count
+
+### Changed
+- A device line in a notification now shows when the *earliest* of its entities went down, not the first one in alphabetical order
+
+### Notes
+- Backward compatible: existing installations keep reporting per domain, and entities and attributes are unchanged apart from the new one
+
 ## [1.4.0] - 2026-11-20
 ### Added
 - **Count sensor per watched domain** (#7): `sensor.entity_watchguard_<domain>_unavailable` shows the number of unavailable entities in that domain directly as its state, where the per-domain problem binary sensor only says OK/Problem. Unit `entities`, state class `measurement` for long-term statistics. Attributes: `domain`, `warming_up`. Stays at `0` during the startup grace period

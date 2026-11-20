@@ -20,7 +20,7 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 - Stufe 1 wird bei Push-Integrationen (MQTT, ZHA, ESPHome …) automatisch übersprungen — erneutes Abfragen kann dort nichts bewirken
 - **Events** für jede Wiederherstellungsaktion, ihr Ergebnis und jede danach zurückgekehrte Entity – für Recovery-Statistiken mit Automationen und Recorder ([Events](#events))
 - Startkarenz: Nach einem Neustart von Home Assistant bleibt die Integration eine einstellbare Zeit still, weil Entities einige Minuten brauchen, bis sie da sind
-- Drei Meldewege, jeder einzeln abschaltbar: **persistente Benachrichtigungen** (eine pro Domain, aktualisiert sich selbst, verschwindet automatisch, Entities pro Gerät gruppiert), **Reparatur-Hinweise** (pro Domain ignorierbar) und ein optionaler **Notify-Dienst** für Push aufs Handy
+- Drei Meldewege, jeder einzeln abschaltbar: **persistente Benachrichtigungen** (pro Domain oder pro Gerät, aktualisiert sich selbst, verschwindet automatisch, Entities pro Gerät gruppiert), **Reparatur-Hinweise** (pro Domain ignorierbar) und ein optionaler **Notify-Dienst** für Push aufs Handy
 - Buttons **Jetzt prüfen** / **Wiederherstellen** für alles, worauf du nicht warten willst
 - Eingebaute **Dashboard-Karte** mit Zeilen pro Domain, Ausfall-Details pro Entity und einer Ein-Klick-Aktion „diese Entity ignorieren" — wird automatisch registriert, nichts separat zu installieren
 - Schonend für die CPU: ein Scan im Arbeitsspeicher pro Intervall (Standard 60 s), kein Template-Rendering und keine State-Change-Listener. Lange Entity-Listen bleiben aus dem Recorder heraus
@@ -120,10 +120,11 @@ In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard
 | Ausnahmen | Entities / Geräte / Bereiche | – | Explizite Auswahl |
 | Ausnahmen | Integrationen | – | Alles, was diese Integration liefert, z. B. `shelly`, `mqtt`, `hue` — praktisch für ein ganzes System, das bewusst offline ist |
 | Ausnahmen | Muster | – | Regex auf die Entity-ID, z. B. `.*_internet_access$` |
-| Benachrichtigungen | Persistente Benachrichtigungen | an | Eine pro Domain, aktualisiert sich selbst, verschwindet automatisch. Entities desselben Geräts werden zu einer Zeile zusammengefasst |
+| Benachrichtigungen | Persistente Benachrichtigungen | an | Aktualisiert sich selbst, verschwindet automatisch. Pro Domain: eine Benachrichtigung pro Domain, Entities desselben Geräts zu einer Zeile zusammengefasst. Pro Gerät: eine Benachrichtigung für alle Domains (siehe *Melden pro*) |
 | Benachrichtigungen | Reparatur-Hinweise | an | Spiegelt dieselben Ausfälle nach Einstellungen → Reparaturen, wo sie pro Domain ignoriert werden können |
 | Benachrichtigungen | Benachrichtigen nach | 900 s | Gedacht für *nach* den fehlgeschlagenen Wiederherstellungsversuchen |
-| Benachrichtigungen | Notify-Dienst | – | Optional, z. B. `notify.mobile_app_handy`. Wird nur gerufen, wenn eine Domain ein Problem bekommt oder wieder loswird, nie bei jedem Prüflauf |
+| Benachrichtigungen | Melden pro | Domain | Was persistente Benachrichtigung und Notify-Dienst melden. **Domain**: jede nicht verfügbare Entity, eine Benachrichtigung pro Domain. **Gerät**: nur Geräte, deren überwachte Entities *alle* nicht verfügbar sind — ein toter Shelly mit Entities in drei Domains ist eine Zeile statt drei Benachrichtigungen; ein Gerät, bei dem nur das Firmware-Update-Entity hängt, wird nicht gemeldet. Entities ohne Gerät (Templates, Helfer) stehen in einem eigenen Abschnitt. **Beides**: Domain- und Gerätebenachrichtigungen nebeneinander. Reparatur-Hinweise bleiben immer pro Domain |
+| Benachrichtigungen | Notify-Dienst | – | Optional, z. B. `notify.mobile_app_handy`. Wird nur gerufen, wenn etwas ausfällt oder zurückkommt, nie bei jedem Prüflauf. Pro Gerät landet alles, was sich in einem Prüflauf geändert hat, in einer Nachricht — ein Stromausfall mit fünf toten Geräten schickt einen Push |
 
 Es wird nur eine Instanz unterstützt — sie überwacht die gesamte Home-Assistant-Instanz.
 
@@ -135,7 +136,7 @@ Es wird nur eine Instanz unterstützt — sie überwacht die gesamte Home-Assist
 | `sensor.entity_watchguard_<domain>_unavailable` | Anzahl | Anzahl nicht verfügbarer Entities in dieser Domain als Zustand — für Kacheln, Verlaufsdiagramme und Langzeitstatistik (Einheit `entities`, State-Class `measurement`). **Standardmäßig deaktiviert**, pro Domain aktivierbar unter Einstellungen → Geräte & Dienste → Entity Watchguard → Entities. Attribute: `domain`, `warming_up` |
 | `binary_sensor.entity_watchguard_problem` | problem | AN, wenn irgendeine überwachte Domain ein Problem hat. Attribute: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | Anzahl | Summe über alle überwachten Domains, Aufschlüsselung `per_domain` in den Attributen |
-| `sensor.entity_watchguard_unavailable_devices` | Anzahl | Geräte mit mindestens einer nicht verfügbaren Entity — ein ausgefallenes Gerät mit zwölf Entities zählt einmal. Attribute: `unavailable_devices` (Gerätenamen, einer pro Gerät), `fully_unavailable` (Geräte, bei denen jede überwachte Entity weg ist), `entities_without_device` (nicht verfügbare Entities ohne Gerät, z. B. Templates), `details` (Zeilen pro Gerät: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`), `truncated`, `warming_up` |
+| `sensor.entity_watchguard_unavailable_devices` | Anzahl | Geräte mit mindestens einer nicht verfügbaren Entity — ein ausgefallenes Gerät mit zwölf Entities zählt einmal. Attribute: `unavailable_devices` (Gerätenamen, einer pro Gerät), `fully_unavailable` (Anzahl der Geräte, bei denen jede überwachte Entity weg ist), `fully_unavailable_devices` (ihre Namen), `entities_without_device` (nicht verfügbare Entities ohne Gerät, z. B. Templates), `details` (Zeilen pro Gerät: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`), `truncated`, `warming_up` |
 | `sensor.entity_watchguard_last_recovery_attempt` | Zeitstempel | Diagnose |
 | `button.entity_watchguard_check_now` | Button | Sofort scannen, statt auf das Prüfintervall zu warten — beendet außerdem die Startkarenz vorzeitig |
 | `button.entity_watchguard_recover_now` | Button | Stufe 1 für alles gerade Nichtverfügbare, ohne die Wartezeiten |
