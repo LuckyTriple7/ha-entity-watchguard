@@ -72,11 +72,12 @@
       },
       "notifications": {
         "title": "Benachrichtigungen",
-        "description": "Eine persistente Benachrichtigung pro Domain; sie aktualisiert sich selbst und verschwindet automatisch, sobald die Domain wieder sauber ist. Reparatur-Hinweise erscheinen unter Einstellungen → Reparaturen und lassen sich pro Domain ignorieren. Ein Notify-Dienst (z. B. notify.mobile_app_handy) wird nur beim Wechsel des Zustands gerufen, nicht bei jedem Prüflauf.",
+        "description": "Persistente Benachrichtigungen aktualisieren sich selbst und verschwinden automatisch, sobald alles wieder verfügbar ist. „Melden pro“ legt fest, was sie und der Notify-Dienst melden: pro Domain jede nicht verfügbare Entity (eine Benachrichtigung pro Domain); pro Gerät nur Geräte, deren überwachte Entities alle nicht verfügbar sind, über alle Domains in einer Benachrichtigung, dazu Entities ohne Gerät. Reparatur-Hinweise erscheinen unter Einstellungen → Reparaturen, immer pro Domain, und lassen sich pro Domain ignorieren. Ein Notify-Dienst (z. B. notify.mobile_app_handy) wird nur gerufen, wenn etwas ausfällt oder zurückkommt, nicht bei jedem Prüflauf.",
         "data": {
           "notify_enabled": "Persistente Benachrichtigungen aktivieren",
           "repairs_enabled": "Reparatur-Hinweise aktivieren",
           "notify_delay": "Benachrichtigen nach",
+          "notify_grouping": "Melden pro",
           "notify_service": "Notify-Dienst (optional)"
         }
       }
@@ -128,6 +129,15 @@
     "binary_sensor": {
       "problem": {
         "name": "Problem"
+      }
+    }
+  },
+  "selector": {
+    "notify_grouping": {
+      "options": {
+        "domain": "Domain (jede nicht verfügbare Entity)",
+        "device": "Gerät (nur komplett ausgefallene Geräte)",
+        "both": "Beides"
       }
     }
   }

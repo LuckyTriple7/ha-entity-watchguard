@@ -70,6 +70,8 @@ async def test_counts_devices_not_entities(hass, setup_watchguard):
     assert sensor.attributes["unavailable_devices"] == ["Attic Plug", "Shelly Kitchen"]
     assert sensor.attributes["entities_without_device"] == 1
     assert sensor.attributes["fully_unavailable"] == 1
+    # Only the Shelly is completely down; the plug's LED still works.
+    assert sensor.attributes["fully_unavailable_devices"] == ["Shelly Kitchen"]
     assert sensor.attributes["truncated"] is False
 
     attic, kitchen = sensor.attributes["details"]

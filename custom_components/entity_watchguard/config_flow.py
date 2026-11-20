@@ -41,6 +41,7 @@ from .const import (
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_DELAY,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_GROUPING,
     CONF_NOTIFY_SERVICE,
     CONF_RELOAD_COOLDOWN,
     CONF_REPAIRS_ENABLED,
@@ -53,6 +54,7 @@ from .const import (
     CONF_STARTUP_DELAY,
     DEFAULT_MONITORED_DOMAINS,
     DOMAIN,
+    NOTIFY_GROUPINGS,
     SUGGESTED_DOMAINS,
     effective_options,
 )
@@ -297,6 +299,15 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_NOTIFY_DELAY, default=current[CONF_NOTIFY_DELAY]
                 ): _seconds(0, 86400),
+                vol.Required(
+                    CONF_NOTIFY_GROUPING, default=current[CONF_NOTIFY_GROUPING]
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=NOTIFY_GROUPINGS,
+                        translation_key=CONF_NOTIFY_GROUPING,
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Optional(
                     CONF_NOTIFY_SERVICE, default=current[CONF_NOTIFY_SERVICE]
                 ): _notify_service_selector(self.hass, current[CONF_NOTIFY_SERVICE]),

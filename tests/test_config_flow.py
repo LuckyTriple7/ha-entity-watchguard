@@ -9,6 +9,7 @@ from custom_components.entity_watchguard.const import (
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_DELAY,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_GROUPING,
     CONF_STAGE1_DELAY,
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
@@ -119,3 +120,24 @@ async def test_options_notifications_step(hass, setup_watchguard):
 
     assert entry.options[CONF_NOTIFY_ENABLED] is True
     assert entry.options[CONF_NOTIFY_DELAY] == 30
+
+
+async def test_options_notify_grouping(hass, setup_watchguard):
+    entry, _ = await setup_watchguard()
+    # Existing installations keep reporting per domain.
+    assert CONF_NOTIFY_GROUPING not in entry.options
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "notifications"}
+    )
+    schema_keys = {str(key): key for key in result["data_schema"].schema}
+    assert schema_keys[CONF_NOTIFY_GROUPING].default() == "domain"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_NOTIFY_GROUPING: "device"}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_NOTIFY_GROUPING] == "device"

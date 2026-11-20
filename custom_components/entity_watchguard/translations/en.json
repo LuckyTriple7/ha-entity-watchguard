@@ -72,11 +72,12 @@
       },
       "notifications": {
         "title": "Notifications",
-        "description": "One persistent notification per domain; it updates itself and is dismissed automatically once the domain is clean again. Repair issues show up under Settings → Repairs and can be ignored per domain. A notify service (e.g. notify.mobile_app_phone) is only called when a domain starts or stops having a problem, not on every check.",
+        "description": "Persistent notifications update themselves and are dismissed automatically once everything is available again. \"Report per\" decides what they and the notify service report: per domain lists every unavailable entity (one notification per domain); per device reports only devices whose watched entities are all unavailable, across all domains in one notification, plus entities that belong to no device. Repair issues show up under Settings → Repairs, always per domain, and can be ignored per domain. A notify service (e.g. notify.mobile_app_phone) is only called when something goes down or comes back, not on every check.",
         "data": {
           "notify_enabled": "Enable persistent notifications",
           "repairs_enabled": "Enable repair issues",
           "notify_delay": "Notify after",
+          "notify_grouping": "Report per",
           "notify_service": "Notify service (optional)"
         }
       }
@@ -128,6 +129,15 @@
     "binary_sensor": {
       "problem": {
         "name": "Problem"
+      }
+    }
+  },
+  "selector": {
+    "notify_grouping": {
+      "options": {
+        "domain": "Domain (every unavailable entity)",
+        "device": "Device (only completely unavailable devices)",
+        "both": "Both"
       }
     }
   }

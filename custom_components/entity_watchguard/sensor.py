@@ -105,7 +105,9 @@ class WatchguardDeviceSensor(WatchguardEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "devices"
     _attr_icon = "mdi:devices"
-    _unrecorded_attributes = frozenset({"unavailable_devices", "details"})
+    _unrecorded_attributes = frozenset(
+        {"unavailable_devices", "fully_unavailable_devices", "details"}
+    )
 
     def __init__(self, coordinator: WatchguardCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator, entry)
@@ -129,6 +131,9 @@ class WatchguardDeviceSensor(WatchguardEntity, SensorEntity):
             "warming_up": self.coordinator.data["warming_up"],
             "unavailable_devices": [device.name for device in devices[:MAX_LISTED]],
             "fully_unavailable": sum(1 for device in devices if device.fully_unavailable),
+            "fully_unavailable_devices": [
+                device.name for device in devices if device.fully_unavailable
+            ][:MAX_LISTED],
             "entities_without_device": self.coordinator.data.get("entities_without_device", 0),
             "details": [
                 {

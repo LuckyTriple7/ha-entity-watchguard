@@ -29,6 +29,7 @@ from .const import (
     CONF_MONITORED_DOMAINS,
     CONF_NOTIFY_DELAY,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_GROUPING,
     CONF_NOTIFY_SERVICE,
     CONF_RELOAD_COOLDOWN,
     CONF_REPAIRS_ENABLED,
@@ -39,11 +40,14 @@ from .const import (
     CONF_STAGE2_ENABLED,
     CONF_STAGE2_MIN_AFFECTED,
     CONF_STARTUP_DELAY,
+    DEVICE_NOTIFICATION_ID,
     DOMAIN,
     EVENT_ENTITY_RECOVERED,
     EVENT_RECOVERY_ATTEMPT,
     EVENT_RECOVERY_RESULT,
     NOTIFICATION_ID_PREFIX,
+    NOTIFY_GROUPING_DEVICE,
+    NOTIFY_GROUPING_DOMAIN,
     RESULT_FAILED,
     RESULT_SUCCESS,
     TRIGGER_AUTOMATIC,
@@ -106,6 +110,33 @@ class Outage:
     given_up: int = 0
 
 
+@dataclass(slots=True)
+class DeviceOutage:
+    """What gets reported per device (notification / push).
+
+    Only devices whose watched entities are *all* unavailable count, so a hung
+    firmware-update entity doesn't announce a working device as dead. Entities
+    without a device can't be grouped and are listed on their own.
+    """
+
+    # device id -> (name, line), sorted by name
+    devices: dict[str, tuple[str, str]] = field(default_factory=dict)
+    # entity id -> (name, line) for entities without a device
+    entities: dict[str, tuple[str, str]] = field(default_factory=dict)
+
+    @property
+    def names(self) -> dict[str, str]:
+        """Every reported key (device id or entity id) -> display name."""
+        return {key: name for key, (name, _) in (self.devices | self.entities).items()}
+
+    def only(self, keys: set[str]) -> "DeviceOutage":
+        """The part of this outage whose keys are in `keys`."""
+        return DeviceOutage(
+            devices={key: value for key, value in self.devices.items() if key in keys},
+            entities={key: value for key, value in self.entities.items() if key in keys},
+        )
+
+
 def _since(tracked: Tracked, use_de: bool) -> str:
     stamp = dt_util.as_local(tracked.first_unavailable).strftime("%d.%m.%Y %H:%M")
     return f"{'seit' if use_de else 'since'} {stamp}"
@@ -123,10 +154,13 @@ def _entity_line(entity_id: str, tracked: Tracked, use_de: bool) -> str:
 def _device_line(
     device_name: str | None, members: list[tuple[str, "Tracked"]], use_de: bool
 ) -> str:
-    _, first = members[0]
+    first = min((tracked for _, tracked in members), key=lambda item: item.first_unavailable)
     mark = _given_up_mark(use_de) if all(tracked.given_up for _, tracked in members) else ""
     name = device_name or ("Unbekanntes Gerät" if use_de else "Unknown device")
-    label = "Entities" if use_de else "entities"
+    if len(members) == 1:
+        label = "Entity" if use_de else "entity"
+    else:
+        label = "Entities" if use_de else "entities"
     listed = ", ".join(entity_id for entity_id, _ in members[:5])
     if len(members) > 5:
         listed += ", …"
@@ -183,6 +217,9 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._notifications: dict[str, str] = {}
         self._issues: set[str] = set()
         self._pushed: set[str] = set()
+        # Devices (and device-less entities) already announced via the notify
+        # service in device mode: key -> name, for the "available again" text.
+        self._pushed_devices: dict[str, str] = {}
         # Set by the Check now button; consumed by the next _build_data().
         self._skip_grace_once = False
         # platform -> iot_class from its manifest (None = could not resolve)
@@ -450,21 +487,11 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                 continue
             by_device.setdefault(device_id, []).append(entity_id)
 
-        monitored = set(self.monitored_domains)
-        exclusion = self._exclusion or build_exclusion(self.hass, self.options)
         devices: list[DeviceReport] = []
         for device_id, members in by_device.items():
             device = dev_reg.async_get(device_id)
             tracked = [self._tracked[entity_id] for entity_id in members]
-            # What this device would report if all of it were down: its enabled
-            # entities in a watched domain that aren't excluded and have a state.
-            watched = {
-                entry.entity_id
-                for entry in er.async_entries_for_device(ent_reg, device_id)
-                if entry.domain in monitored
-                and not exclusion.excludes(entry.entity_id)
-                and self.hass.states.get(entry.entity_id) is not None
-            }
+            watched = self._watched_device_entities(device_id)
             devices.append(
                 DeviceReport(
                     device_id=device_id,
@@ -477,6 +504,23 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             )
         devices.sort(key=lambda report: (report.name.casefold(), report.device_id))
         return devices, without_device
+
+    def _watched_device_entities(self, device_id: str) -> set[str]:
+        """What a device would report if all of it were down.
+
+        Its enabled entities in a watched domain that aren't excluded and have
+        a state — the yardstick for "fully unavailable".
+        """
+        ent_reg = er.async_get(self.hass)
+        monitored = set(self.monitored_domains)
+        exclusion = self._exclusion or build_exclusion(self.hass, self.options)
+        return {
+            entry.entity_id
+            for entry in er.async_entries_for_device(ent_reg, device_id)
+            if entry.domain in monitored
+            and not exclusion.excludes(entry.entity_id)
+            and self.hass.states.get(entry.entity_id) is not None
+        }
 
     # --- recovery -------------------------------------------------------
     async def _async_recover(self, now: datetime) -> None:
@@ -812,11 +856,21 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._followup_cancels = []
 
     # --- reporting: notifications, repairs, push -------------------------
+    @property
+    def _report_domains(self) -> bool:
+        return self.options[CONF_NOTIFY_GROUPING] != NOTIFY_GROUPING_DEVICE
+
+    @property
+    def _report_devices(self) -> bool:
+        return self.options[CONF_NOTIFY_GROUPING] != NOTIFY_GROUPING_DOMAIN
+
     async def _async_report(self, now: datetime) -> None:
         outages = self._async_outages(now)
-        self._async_update_notifications(outages)
+        device_outage = self._async_device_outage(now) if self._report_devices else DeviceOutage()
+        self._async_update_notifications(outages, device_outage)
         self._async_update_repairs(outages)
         await self._async_push(outages)
+        await self._async_push_devices(device_outage)
 
     def _async_outages(self, now: datetime) -> dict[str, Outage]:
         """Entities past the notify delay, grouped per domain and per device."""
@@ -855,30 +909,109 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
             outages[domain] = outage
         return outages
 
-    def _async_update_notifications(self, outages: dict[str, Outage]) -> None:
+    def _async_device_outage(self, now: datetime) -> DeviceOutage:
+        """Completely unavailable devices past the notify delay, across domains.
+
+        A device counts once every watched entity of it is past the delay, so
+        a dead Shelly with entities in three domains is one line, not three
+        notifications. Partly unavailable devices are left to the domain view.
+        """
+        delay = timedelta(seconds=self.options[CONF_NOTIFY_DELAY])
+        use_de = self.hass.config.language[:2].lower() == "de"
+        ent_reg = er.async_get(self.hass)
+        dev_reg = dr.async_get(self.hass)
+
+        by_device: dict[str, list[tuple[str, Tracked]]] = {}
+        without_device: list[tuple[str, Tracked]] = []
+        for entity_id, tracked in sorted(self._tracked.items()):
+            if now - tracked.first_unavailable < delay:
+                continue
+            registry_entry = ent_reg.async_get(entity_id)
+            device_id = registry_entry.device_id if registry_entry else None
+            if device_id is None or dev_reg.async_get(device_id) is None:
+                without_device.append((entity_id, tracked))
+            else:
+                by_device.setdefault(device_id, []).append((entity_id, tracked))
+
+        down: list[tuple[str, str, str, list[tuple[str, Tracked]]]] = []
+        for device_id, members in by_device.items():
+            if not self._watched_device_entities(device_id) <= {item for item, _ in members}:
+                continue
+            device = dev_reg.async_get(device_id)
+            name = device.name_by_user or device.name or device_id
+            down.append((name.casefold(), device_id, name, members))
+        down.sort()
+
+        outage = DeviceOutage()
+        for _, device_id, name, members in down:
+            outage.devices[device_id] = (name, _device_line(name, members, use_de))
+        for entity_id, tracked in without_device:
+            outage.entities[entity_id] = (tracked.name, _entity_line(entity_id, tracked, use_de))
+        return outage
+
+    def _device_message(self, outage: DeviceOutage, use_de: bool) -> str:
+        parts = []
+        if outage.devices:
+            parts.append(
+                ("Nicht verfügbare Geräte:" if use_de else "Unavailable devices:")
+                + "\n"
+                + "\n".join(line for _, line in outage.devices.values())
+            )
+        if outage.entities:
+            parts.append(
+                ("Nicht verfügbar, ohne Gerät:" if use_de else "Unavailable, without a device:")
+                + "\n"
+                + "\n".join(line for _, line in outage.entities.values())
+            )
+        return "\n\n".join(parts)
+
+    def _async_update_notifications(
+        self, outages: dict[str, Outage], device_outage: DeviceOutage
+    ) -> None:
         if not self.options[CONF_NOTIFY_ENABLED]:
             self._async_clear_notifications()
             return
 
         use_de = self.hass.config.language[:2].lower() == "de"
-        for domain, outage in outages.items():
-            notification_id = f"{NOTIFICATION_ID_PREFIX}{domain}"
-            title = f"Entity Watchguard – {domain} ({len(outage.entity_ids)})"
-            intro = (
-                f"Nicht verfügbare Entities in `{domain}`:"
-                if use_de
-                else f"Unavailable entities in `{domain}`:"
+        wanted: dict[str, tuple[str, str]] = {}
+        if self._report_domains:
+            for domain, outage in outages.items():
+                intro = (
+                    f"Nicht verfügbare Entities in `{domain}`:"
+                    if use_de
+                    else f"Unavailable entities in `{domain}`:"
+                )
+                wanted[f"{NOTIFICATION_ID_PREFIX}{domain}"] = (
+                    f"Entity Watchguard – {domain} ({len(outage.entity_ids)})",
+                    intro + "\n" + "\n".join(outage.lines),
+                )
+        if device_outage.names:
+            counts = []
+            if device_outage.devices:
+                count = len(device_outage.devices)
+                if use_de:
+                    counts.append(f"{count} {'Gerät' if count == 1 else 'Geräte'}")
+                else:
+                    counts.append(f"{count} {'device' if count == 1 else 'devices'}")
+            if device_outage.entities:
+                counts.append(
+                    f"{len(device_outage.entities)} {'ohne Gerät' if use_de else 'without device'}"
+                )
+            wanted[DEVICE_NOTIFICATION_ID] = (
+                f"Entity Watchguard – {'Geräte' if use_de else 'devices'} ({', '.join(counts)})",
+                self._device_message(device_outage, use_de),
             )
-            message = intro + "\n" + "\n".join(outage.lines)
+
+        for notification_id, (title, message) in wanted.items():
             # Re-create only on change: same notification_id replaces in place,
             # but a needless rewrite marks the notification unread again.
-            if self._notifications.get(notification_id) == message:
+            if self._notifications.get(notification_id) == f"{title}\n{message}":
                 continue
             persistent_notification.async_create(self.hass, message, title, notification_id)
-            self._notifications[notification_id] = message
+            self._notifications[notification_id] = f"{title}\n{message}"
 
         for notification_id in list(self._notifications):
-            if notification_id.removeprefix(NOTIFICATION_ID_PREFIX) not in outages:
+            if notification_id not in wanted:
                 persistent_notification.async_dismiss(self.hass, notification_id)
                 del self._notifications[notification_id]
 
@@ -918,7 +1051,7 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
     async def _async_push(self, outages: dict[str, Outage]) -> None:
         """Fire the configured notify service on state changes only."""
         service = (self.options[CONF_NOTIFY_SERVICE] or "").strip()
-        if not service:
+        if not service or not self._report_domains:
             self._pushed.clear()
             return
 
@@ -945,6 +1078,30 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
                 else f"{domain}: all entities available again"
             )
             await self._async_call_notify(service, message)
+
+    async def _async_push_devices(self, outage: DeviceOutage) -> None:
+        """Device mode: one push per check for what went down or came back.
+
+        Batched, so a power cut that takes out five devices sends one message
+        instead of five.
+        """
+        service = (self.options[CONF_NOTIFY_SERVICE] or "").strip()
+        if not service or not self._report_devices:
+            self._pushed_devices.clear()
+            return
+
+        use_de = self.hass.config.language[:2].lower() == "de"
+        current = outage.names
+        new_down = outage.only(set(current) - set(self._pushed_devices))
+        if new_down.names:
+            await self._async_call_notify(service, self._device_message(new_down, use_de))
+
+        back = [name for key, name in self._pushed_devices.items() if key not in current]
+        if back:
+            message = ("Wieder verfügbar: " if use_de else "Available again: ") + ", ".join(back)
+            await self._async_call_notify(service, message)
+
+        self._pushed_devices = current
 
     async def _async_call_notify(self, service: str, message: str) -> None:
         domain, _, service_name = service.partition(".")
@@ -973,3 +1130,4 @@ class WatchguardCoordinator(DataUpdateCoordinator[dict]):
         self._async_clear_notifications()
         self._async_clear_repairs()
         self._pushed.clear()
+        self._pushed_devices.clear()

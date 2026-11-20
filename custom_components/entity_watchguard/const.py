@@ -23,6 +23,7 @@ CONF_NOTIFY_ENABLED = "notify_enabled"
 CONF_NOTIFY_DELAY = "notify_delay"
 CONF_REPAIRS_ENABLED = "repairs_enabled"
 CONF_NOTIFY_SERVICE = "notify_service"
+CONF_NOTIFY_GROUPING = "notify_grouping"
 
 CONF_EXCLUDE_LABELS = "exclude_labels"
 CONF_EXCLUDE_ENTITIES = "exclude_entities"
@@ -87,6 +88,15 @@ DEFAULT_NOTIFY_DELAY = 900
 DEFAULT_REPAIRS_ENABLED = True
 DEFAULT_NOTIFY_SERVICE = ""
 
+# What the persistent notification and the notify service report: per domain
+# (every unavailable entity), per device (only devices that are completely
+# down, plus entities without a device), or both. Repair issues stay per domain.
+NOTIFY_GROUPING_DOMAIN = "domain"
+NOTIFY_GROUPING_DEVICE = "device"
+NOTIFY_GROUPING_BOTH = "both"
+NOTIFY_GROUPINGS = [NOTIFY_GROUPING_DOMAIN, NOTIFY_GROUPING_DEVICE, NOTIFY_GROUPING_BOTH]
+DEFAULT_NOTIFY_GROUPING = NOTIFY_GROUPING_DOMAIN
+
 # Deliberately empty: label names are per-instance, so guessing "offline" here
 # would silently hide entities in setups that use that label for something else.
 DEFAULT_EXCLUDE_LABELS: list[str] = []
@@ -113,6 +123,8 @@ RESULT_FAILED = "failed"
 
 # --- misc ---------------------------------------------------------------
 NOTIFICATION_ID_PREFIX = f"{DOMAIN}_"
+# The double underscore keeps it apart from the per-domain ids above.
+DEVICE_NOTIFICATION_ID = f"{DOMAIN}__devices"
 
 # A single integration going down can take hundreds of entities with it, and
 # the full list would otherwise be written to the state machine (and the
@@ -137,6 +149,7 @@ DEFAULTS: dict[str, object] = {
     CONF_NOTIFY_DELAY: DEFAULT_NOTIFY_DELAY,
     CONF_REPAIRS_ENABLED: DEFAULT_REPAIRS_ENABLED,
     CONF_NOTIFY_SERVICE: DEFAULT_NOTIFY_SERVICE,
+    CONF_NOTIFY_GROUPING: DEFAULT_NOTIFY_GROUPING,
     CONF_EXCLUDE_LABELS: DEFAULT_EXCLUDE_LABELS,
     CONF_EXCLUDE_ENTITIES: [],
     CONF_EXCLUDE_PATTERNS: [],
