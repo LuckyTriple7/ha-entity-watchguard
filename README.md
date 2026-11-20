@@ -120,7 +120,7 @@ For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard 
 | Exceptions | Labels | – | Set on an entity, device or area; e.g. an `offline` label for devices you knowingly powered down |
 | Exceptions | Entities / Devices / Areas | – | Explicit pickers |
 | Exceptions | Integrations | – | Everything provided by that integration, e.g. `shelly`, `mqtt`, `hue` — useful for a whole system you knowingly leave offline |
-| Exceptions | Entity categories | – | **Configuration** and/or **Diagnostic**. Diagnostic entities (signal strength, firmware update, last seen, uptime) often drop out while the device itself works fine. Careful: some integrations, e.g. Shelly or ESPHome, also put their connection status there — excluding Diagnostic hides that too. Excluded entities also don't count when deciding whether a device is *completely* unavailable |
+| Exceptions | Entity categories | – | **Configuration** and/or **Diagnostic**. Diagnostic entities (signal strength, firmware update, last seen, uptime) often drop out while the device itself works fine. Careful: some integrations also put a connection status there, e.g. ESPHome's *Status* sensor — excluding Diagnostic hides that too. Excluded entities also don't count when deciding whether a device is *completely* unavailable |
 | Exceptions | Patterns | – | Regex against the entity ID, e.g. `.*_internet_access$` |
 | Notifications | Persistent notifications | on | Self-updating, auto-dismissed. Per domain: one notification per domain, entities of the same device collapsed into one line. Per device: one notification for all domains (see *Report per*) |
 | Notifications | Repair issues | on | Mirrors the same outages into Settings → Repairs, where they can be ignored per domain |

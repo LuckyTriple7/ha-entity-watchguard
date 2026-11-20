@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - Excluded entities don't count when deciding whether a device is completely unavailable, so with Diagnostic excluded a dead device whose signal-strength entity still has a value counts as completely down (device sensor, notifications per device)
 
 ### Notes
-- Some integrations, e.g. Shelly or ESPHome, also put their connection status in the Diagnostic category; excluding it hides that entity too
+- Some integrations also put a connection status in the Diagnostic category, e.g. ESPHome's *Status* sensor; excluding it hides that entity too
 - Entities without an entity registry entry (YAML templates) have no category and are never excluded by it
 - Backward compatible: no category is excluded by default
 
