@@ -7,12 +7,12 @@
 
 **English** · [Deutsch](README.de.md)
 
-Home Assistant custom integration that watches your entities for the `unavailable` state, reports them per domain, and tries to bring them back — the UI-configurable replacement for a pile of hand-written `unavailable` template sensors.
+Home Assistant custom integration that watches your entities for the `unavailable` state, reports them per domain or per device, and tries to bring them back — the UI-configurable replacement for a pile of hand-written `unavailable` template sensors.
 
 ## Features
 
 - One `problem` binary sensor per watched domain (`light`, `switch`, `sensor`, `binary_sensor`, …), listing the affected entities in its attributes, plus one overall problem sensor
-- Counters for **unavailable entities** and **unavailable devices** — a dead device with a dozen entities counts once on the device sensor, which lists the device names
+- Counters for **unavailable entities** and **unavailable devices** — a dead device with a dozen entities counts once on the device sensor, which lists the device names and which of them are completely down
 - Optional **count sensor per domain** (disabled by default) that shows the number of unavailable entities directly as its state
 - Pick the watched domains in the UI — the picker offers every domain that exists in your instance
 - Exceptions by **label**, **entity**, **device**, **area**, **integration** and **regex pattern** on the entity ID
@@ -20,7 +20,8 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …), where re-polling cannot achieve anything
 - **Events** for every recovery operation, its outcome and every entity that came back afterwards — for recovery statistics with automations and the recorder ([Events](#events))
 - Startup grace period: after a Home Assistant restart the integration stays quiet for a configurable time, because entities need a few minutes to come up
-- Three reporting channels, each switchable: **persistent notifications** (per domain or per device, self-updating, auto-dismissed, entities grouped per device), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
+- Three reporting channels, each switchable: **persistent notifications** (self-updating, auto-dismissed), **repair issues** (ignorable per domain), and an optional **notify service** for mobile push
+- Report **per domain** or **per device**: per device, a dead device is one line across all its domains, only devices that are completely down are reported, and a power cut sends one push instead of one per device ([Notifications](#notifications))
 - **Check now** / **Recover now** buttons for everything you don't want to wait for
 - Built-in **dashboard card** with per-domain rows, per-entity outage details and a one-click "ignore this entity" action — registered automatically, nothing to install separately
 - Light on CPU: one in-memory scan per interval (default 60 s), no template rendering and no state-change listeners. Long entity lists are kept out of the recorder
@@ -127,6 +128,49 @@ For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard 
 | Notifications | Notify service | – | Optional, e.g. `notify.mobile_app_phone`. Called only when something goes down or comes back, never on every check. Per device, everything that changed in one check goes into one message, so a power cut that takes out five devices sends one push |
 
 Only one instance is supported — it watches the whole Home Assistant instance.
+
+## Notifications
+
+*Report per* (Configure → Notifications) decides what the persistent notification and the notify service report. Example: a dead Shelly with entities in `light` and `switch`, a hall lamp that is off at the wall, a plug whose relay is gone while its LED still works, and a template light without a device.
+
+**Per domain** (default): one notification per domain, every unavailable entity, entities of the same device collapsed into one line.
+
+```
+Entity Watchguard – light (4)
+Unavailable entities in `light`:
+• Hall Lamp (light.hall) – since 20.11.2026 08:10
+• Shelly Kitchen: 2 entities (light.relay1, light.relay2) – since 20.11.2026 08:15
+• Template Light (light.template) – since 20.11.2026 08:12
+
+Entity Watchguard – switch (2)
+Unavailable entities in `switch`:
+• Attic Plug (switch.attic) – since 20.11.2026 08:20
+• Shelly Kitchen Relay 3 (switch.relay3) – since 20.11.2026 08:15
+```
+
+**Per device**: one notification for all domains, one line per device. Only devices whose watched entities are *all* unavailable are reported, so the attic plug (LED still on) is left out. Entities without a device get their own section.
+
+```
+Entity Watchguard – devices (2 devices, 1 without device)
+Unavailable devices:
+• Hall Lamp: 1 entity (light.hall) – since 20.11.2026 08:10
+• Shelly Kitchen: 3 entities (light.relay1, light.relay2, switch.relay3) – since 20.11.2026 08:15
+
+Unavailable, without a device:
+• Template Light (light.template) – since 20.11.2026 08:12
+```
+
+**Both**: both kinds side by side.
+
+The **notify service** follows the same setting and is only called on changes. Per domain it sends one message when a domain gets a problem and `light: all entities available again` when it is clean. Per device it sends one message per check with everything that went down (same text as above), and one for everything that came back:
+
+```
+Available again: Shelly Kitchen, Template Light
+```
+
+**Repair issues** always stay per domain, because there they can be ignored per domain.
+
+Which one to pick: *per domain* if you want to know about every single entity, *per device* if you mainly care about dead hardware and want fewer, calmer messages. Partly unavailable devices always show up on the domain sensors, the device sensor and the dashboard card, whatever you pick here.
 
 ## Entities
 
