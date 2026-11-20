@@ -60,13 +60,14 @@
       },
       "exceptions": {
         "title": "Exceptions",
-        "description": "Excluded entities are never reported and never recovered. Integrations are matched by the integration that provides the entity (e.g. shelly, mqtt, hue). Patterns are regular expressions matched against the entity ID, e.g. .*_internet_access$",
+        "description": "Excluded entities are never reported and never recovered. Integrations are matched by the integration that provides the entity (e.g. shelly, mqtt, hue). The Diagnostic category covers things like signal strength, firmware update or last seen, which often drop out while the device itself is fine; some integrations also put their connection status there, though. Patterns are regular expressions matched against the entity ID, e.g. .*_internet_access$",
         "data": {
           "exclude_labels": "Excluded labels",
           "exclude_entities": "Excluded entities",
           "exclude_devices": "Excluded devices",
           "exclude_areas": "Excluded areas",
           "exclude_integrations": "Excluded integrations",
+          "exclude_entity_categories": "Excluded entity categories",
           "exclude_patterns": "Excluded patterns (regex)"
         }
       },
@@ -138,6 +139,12 @@
         "domain": "Domain (every unavailable entity)",
         "device": "Device (only completely unavailable devices)",
         "both": "Both"
+      }
+    },
+    "exclude_entity_categories": {
+      "options": {
+        "config": "Configuration",
+        "diagnostic": "Diagnostic"
       }
     }
   }

@@ -32,6 +32,7 @@ from .const import (
     CONF_EXCLUDE_AREAS,
     CONF_EXCLUDE_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_CATEGORIES,
     CONF_EXCLUDE_INTEGRATIONS,
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
@@ -54,6 +55,7 @@ from .const import (
     CONF_STARTUP_DELAY,
     DEFAULT_MONITORED_DOMAINS,
     DOMAIN,
+    ENTITY_CATEGORIES,
     NOTIFY_GROUPINGS,
     SUGGESTED_DOMAINS,
     effective_options,
@@ -269,6 +271,17 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
                     CONF_EXCLUDE_INTEGRATIONS,
                     default=list(current[CONF_EXCLUDE_INTEGRATIONS]),
                 ): _integration_selector(self.hass, list(current[CONF_EXCLUDE_INTEGRATIONS])),
+                vol.Optional(
+                    CONF_EXCLUDE_ENTITY_CATEGORIES,
+                    default=list(current[CONF_EXCLUDE_ENTITY_CATEGORIES]),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=ENTITY_CATEGORIES,
+                        multiple=True,
+                        translation_key=CONF_EXCLUDE_ENTITY_CATEGORIES,
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Optional(
                     CONF_EXCLUDE_PATTERNS, default=list(current[CONF_EXCLUDE_PATTERNS])
                 ): SelectSelector(

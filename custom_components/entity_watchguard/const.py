@@ -31,6 +31,12 @@ CONF_EXCLUDE_PATTERNS = "exclude_patterns"
 CONF_EXCLUDE_DEVICES = "exclude_devices"
 CONF_EXCLUDE_AREAS = "exclude_areas"
 CONF_EXCLUDE_INTEGRATIONS = "exclude_integrations"
+CONF_EXCLUDE_ENTITY_CATEGORIES = "exclude_entity_categories"
+
+# Home Assistant's two entity categories (EntityCategory values); primary
+# entities have none. Diagnostic ones (signal strength, firmware update, last
+# seen) tend to drop out without the device having a problem.
+ENTITY_CATEGORIES = ["config", "diagnostic"]
 
 # --- defaults -----------------------------------------------------------
 DEFAULT_MONITORED_DOMAINS = [
@@ -156,6 +162,7 @@ DEFAULTS: dict[str, object] = {
     CONF_EXCLUDE_DEVICES: [],
     CONF_EXCLUDE_AREAS: [],
     CONF_EXCLUDE_INTEGRATIONS: [],
+    CONF_EXCLUDE_ENTITY_CATEGORIES: [],
 }
 
 

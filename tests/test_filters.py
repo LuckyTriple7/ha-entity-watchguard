@@ -5,12 +5,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
+from homeassistant.const import EntityCategory
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.entity_watchguard.const import (
     CONF_EXCLUDE_AREAS,
     CONF_EXCLUDE_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_CATEGORIES,
     CONF_EXCLUDE_INTEGRATIONS,
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
@@ -26,6 +28,7 @@ def _options(**overrides) -> dict:
         CONF_EXCLUDE_AREAS: [],
         CONF_EXCLUDE_INTEGRATIONS: [],
         CONF_EXCLUDE_PATTERNS: [],
+        CONF_EXCLUDE_ENTITY_CATEGORIES: [],
         **overrides,
     }
 
@@ -128,3 +131,35 @@ async def test_invalid_pattern_is_ignored(hass):
 
 def test_compile_patterns_drops_invalid():
     assert len(compile_patterns(("[unclosed", "valid"))) == 1
+
+
+async def test_entity_category_excluded(hass):
+    ent_reg = er.async_get(hass)
+    rssi = ent_reg.async_get_or_create(
+        "sensor", "demo", "rssi", suggested_object_id="rssi",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+    setting = ent_reg.async_get_or_create(
+        "number", "demo", "setting", suggested_object_id="setting",
+        entity_category=EntityCategory.CONFIG,
+    )
+    primary = _register(hass, "kitchen")
+
+    exclusion = build_exclusion(hass, _options(**{CONF_EXCLUDE_ENTITY_CATEGORIES: ["diagnostic"]}))
+    assert exclusion.excludes(rssi.entity_id)
+    assert not exclusion.excludes(setting.entity_id)
+    assert not exclusion.excludes(primary.entity_id)
+
+    both = build_exclusion(hass, _options(**{CONF_EXCLUDE_ENTITY_CATEGORIES: ["config", "diagnostic"]}))
+    assert both.excludes(setting.entity_id)
+    # Not in the registry, so no category: never excluded by category.
+    assert not both.excludes("sensor.yaml_template")
+
+
+async def test_no_categories_excludes_nothing(hass):
+    ent_reg = er.async_get(hass)
+    rssi = ent_reg.async_get_or_create(
+        "sensor", "demo", "rssi", suggested_object_id="rssi",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+    assert not build_exclusion(hass, _options()).excludes(rssi.entity_id)

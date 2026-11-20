@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-11-20
+### Added
+- **Exclude by entity category** (#11): new option *Excluded entity categories* under Configure → Exceptions, with **Configuration** and **Diagnostic**. Excluded entities are never reported and never recovered, like every other exception. Diagnostic entities (signal strength, firmware update, last seen, uptime) often drop out while the device itself works fine
+- Excluded entities don't count when deciding whether a device is completely unavailable, so with Diagnostic excluded a dead device whose signal-strength entity still has a value counts as completely down (device sensor, notifications per device)
+
+### Notes
+- Some integrations, e.g. Shelly or ESPHome, also put their connection status in the Diagnostic category; excluding it hides that entity too
+- Entities without an entity registry entry (YAML templates) have no category and are never excluded by it
+- Backward compatible: no category is excluded by default
+
 ## [1.5.0] - 2026-11-20
 ### Added
 - **Notifications per device** (#9): new option *Report per* under Configure → Notifications, with **Domain** (default, as before), **Device** or **Both**. It applies to the persistent notification and the notify service; repair issues always stay per domain

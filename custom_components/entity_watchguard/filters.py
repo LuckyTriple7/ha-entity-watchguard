@@ -20,6 +20,7 @@ from .const import (
     CONF_EXCLUDE_AREAS,
     CONF_EXCLUDE_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_CATEGORIES,
     CONF_EXCLUDE_INTEGRATIONS,
     CONF_EXCLUDE_LABELS,
     CONF_EXCLUDE_PATTERNS,
@@ -60,7 +61,7 @@ class Exclusion:
 
 @callback
 def build_exclusion(hass: HomeAssistant, options: dict) -> Exclusion:
-    """Resolve labels/devices/areas into concrete entity_ids.
+    """Resolve labels/devices/areas/integrations/categories into concrete entity_ids.
 
     Registry lookups happen once per scan; the regex patterns stay lazy since
     they also have to cover entities that aren't in the entity registry at all
@@ -71,6 +72,7 @@ def build_exclusion(hass: HomeAssistant, options: dict) -> Exclusion:
     devices: set[str] = set(options.get(CONF_EXCLUDE_DEVICES) or [])
     areas: set[str] = set(options.get(CONF_EXCLUDE_AREAS) or [])
     integrations: set[str] = set(options.get(CONF_EXCLUDE_INTEGRATIONS) or [])
+    categories: set[str] = set(options.get(CONF_EXCLUDE_ENTITY_CATEGORIES) or [])
 
     ent_reg = er.async_get(hass)
     dev_reg = dr.async_get(hass)
@@ -82,13 +84,17 @@ def build_exclusion(hass: HomeAssistant, options: dict) -> Exclusion:
         for label in labels:
             devices |= {device.id for device in dr.async_entries_for_label(dev_reg, label)}
 
-    if labels or devices or areas or integrations:
+    if labels or devices or areas or integrations or categories:
         for entry in ent_reg.entities.values():
             if entry.entity_id in excluded:
                 continue
             # entry.platform is the integration that provides the entity
             # ("shelly", "mqtt", "hue"), not the entity domain.
             if entry.platform in integrations:
+                excluded.add(entry.entity_id)
+                continue
+            # EntityCategory is a StrEnum, so it matches the stored strings.
+            if entry.entity_category is not None and entry.entity_category in categories:
                 excluded.add(entry.entity_id)
                 continue
             if labels & set(entry.labels):

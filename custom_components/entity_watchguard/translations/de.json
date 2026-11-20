@@ -60,13 +60,14 @@
       },
       "exceptions": {
         "title": "Ausnahmen",
-        "description": "Ausgenommene Entities werden weder gemeldet noch wiederhergestellt. Integrationen beziehen sich auf die Integration, die die Entity liefert (z. B. shelly, mqtt, hue). Muster sind reguläre Ausdrücke auf die Entity-ID, z. B. .*_internet_access$",
+        "description": "Ausgenommene Entities werden weder gemeldet noch wiederhergestellt. Integrationen beziehen sich auf die Integration, die die Entity liefert (z. B. shelly, mqtt, hue). Die Kategorie Diagnose umfasst z. B. Signalstärke, Firmware-Update oder „zuletzt gesehen“, die oft ausfallen, während das Gerät selbst läuft; manche Integrationen legen dort aber auch ihren Verbindungsstatus ab. Muster sind reguläre Ausdrücke auf die Entity-ID, z. B. .*_internet_access$",
         "data": {
           "exclude_labels": "Ausgenommene Labels",
           "exclude_entities": "Ausgenommene Entities",
           "exclude_devices": "Ausgenommene Geräte",
           "exclude_areas": "Ausgenommene Bereiche",
           "exclude_integrations": "Ausgenommene Integrationen",
+          "exclude_entity_categories": "Ausgeschlossene Entity-Kategorien",
           "exclude_patterns": "Ausgenommene Muster (Regex)"
         }
       },
@@ -138,6 +139,12 @@
         "domain": "Domain (jede nicht verfügbare Entity)",
         "device": "Gerät (nur komplett ausgefallene Geräte)",
         "both": "Beides"
+      }
+    },
+    "exclude_entity_categories": {
+      "options": {
+        "config": "Konfiguration",
+        "diagnostic": "Diagnose"
       }
     }
   }

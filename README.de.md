@@ -15,7 +15,7 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 - Zähler für **nicht verfügbare Entities** und **nicht verfügbare Geräte** — ein ausgefallenes Gerät mit einem Dutzend Entities zählt beim Gerätesensor einmal, die Gerätenamen stehen in den Attributen, ebenso welche davon komplett ausgefallen sind
 - Optionaler **Zählsensor pro Domain** (standardmäßig deaktiviert), der die Anzahl nicht verfügbarer Entities direkt als Zustand zeigt
 - Überwachte Domains in der Oberfläche auswählen — die Auswahl bietet jede Domain an, die es in deiner Instanz gibt
-- Ausnahmen per **Label**, **Entity**, **Gerät**, **Bereich**, **Integration** und **Regex-Muster** auf die Entity-ID
+- Ausnahmen per **Label**, **Entity**, **Gerät**, **Bereich**, **Integration**, **Entity-Kategorie** (z. B. Diagnose) und **Regex-Muster** auf die Entity-ID
 - Eskalierende Wiederherstellung: Stufe 1 fragt die Entity erneut ab (`homeassistant.update_entity`), Stufe 2 lädt den Config-Entry der zugehörigen Integration neu. Stufe 2 wiederholt sich in großem Abstand und gibt nach einer einstellbaren Zahl von Versuchen auf
 - Stufe 1 wird bei Push-Integrationen (MQTT, ZHA, ESPHome …) automatisch übersprungen — erneutes Abfragen kann dort nichts bewirken
 - **Events** für jede Wiederherstellungsaktion, ihr Ergebnis und jede danach zurückgekehrte Entity – für Recovery-Statistiken mit Automationen und Recorder ([Events](#events))
@@ -120,6 +120,7 @@ In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard
 | Ausnahmen | Labels | – | An Entity, Gerät oder Bereich gesetzt; z. B. ein `offline`-Label für bewusst abgeschaltete Geräte |
 | Ausnahmen | Entities / Geräte / Bereiche | – | Explizite Auswahl |
 | Ausnahmen | Integrationen | – | Alles, was diese Integration liefert, z. B. `shelly`, `mqtt`, `hue` — praktisch für ein ganzes System, das bewusst offline ist |
+| Ausnahmen | Entity-Kategorien | – | **Konfiguration** und/oder **Diagnose**. Diagnose-Entities (Signalstärke, Firmware-Update, „zuletzt gesehen“, Uptime) fallen oft aus, während das Gerät selbst läuft. Vorsicht: Manche Integrationen, z. B. Shelly oder ESPHome, legen dort auch ihren Verbindungsstatus ab — wer Diagnose ausschließt, blendet den mit aus. Ausgeschlossene Entities zählen auch nicht mit, wenn entschieden wird, ob ein Gerät *komplett* ausgefallen ist |
 | Ausnahmen | Muster | – | Regex auf die Entity-ID, z. B. `.*_internet_access$` |
 | Benachrichtigungen | Persistente Benachrichtigungen | an | Aktualisiert sich selbst, verschwindet automatisch. Pro Domain: eine Benachrichtigung pro Domain, Entities desselben Geräts zu einer Zeile zusammengefasst. Pro Gerät: eine Benachrichtigung für alle Domains (siehe *Melden pro*) |
 | Benachrichtigungen | Reparatur-Hinweise | an | Spiegelt dieselben Ausfälle nach Einstellungen → Reparaturen, wo sie pro Domain ignoriert werden können |
@@ -251,7 +252,7 @@ Beide laufen bei jedem Push in der CI, zusammen mit hassfest und der HACS-Prüfu
 
 ## Hinweise
 
-- Entities, die nicht in der Entity-Registry stehen (YAML-/Template-Entities), lassen sich nur über **Muster** oder die **Entity**-Auswahl ausnehmen; Label-, Geräte-, Bereichs- und Integrations-Ausnahmen brauchen einen Registry-Eintrag.
+- Entities, die nicht in der Entity-Registry stehen (YAML-/Template-Entities), lassen sich nur über **Muster** oder die **Entity**-Auswahl ausnehmen; Label-, Geräte-, Bereichs-, Integrations- und Kategorie-Ausnahmen brauchen einen Registry-Eintrag.
 - Stufe 2 lädt nie den eigenen Config-Entry von Entity Watchguard neu, überspringt nicht geladene Entries und hält den Cooldown ein.
 - Die Push-Erkennung liest `iot_class` aus dem Manifest der Integration. Was sich nicht auflösen lässt, gilt als abfragbar — ein harmloser Dienstaufruf ist billiger als eine verpasste Wiederherstellung.
 - **Es wird nichts angezeigt?** Sieh dir das Attribut `status` eines Domain-Sensors an: `warming_up` heißt, die Startverzögerung läuft noch (mit **Jetzt prüfen** beenden), `ok` bei `count: 0` heißt, es hat nichts gepasst — prüfe, ob die Domain wirklich überwacht wird und ob die Entities `unavailable` sind und nicht `unknown`.
