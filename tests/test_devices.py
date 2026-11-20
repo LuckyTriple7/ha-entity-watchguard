@@ -171,7 +171,6 @@ async def test_device_sensor_while_warming_up(hass, setup_watchguard):
 async def test_excluded_diagnostic_entities_are_ignored(hass, setup_watchguard):
     """A dead device whose diagnostic entity still reports counts as fully down."""
     device_id = _device(hass, "plug", "Attic Plug", {"switch.attic": "unavailable"})
-    config_entry_id = dr.async_get(hass).async_get(device_id).primary_config_entry
     registry = er.async_get(hass)
     for object_id, state in (("attic_rssi", "-70"), ("attic_last_seen", "unavailable")):
         registry.async_get_or_create(
@@ -179,7 +178,6 @@ async def test_excluded_diagnostic_entities_are_ignored(hass, setup_watchguard):
             "demo",
             f"plug_{object_id}",
             suggested_object_id=object_id,
-            config_entry=hass.config_entries.async_get_entry(config_entry_id),
             device_id=device_id,
             entity_category=EntityCategory.DIAGNOSTIC,
         )
