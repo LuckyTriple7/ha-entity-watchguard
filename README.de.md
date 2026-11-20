@@ -7,12 +7,12 @@
 
 [English](README.md) · **Deutsch**
 
-Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwacht, sie pro Domain meldet und versucht, sie zurückzuholen — der über die Oberfläche konfigurierbare Ersatz für einen Stapel handgeschriebener `unavailable`-Template-Sensoren.
+Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwacht, sie pro Domain oder pro Gerät meldet und versucht, sie zurückzuholen — der über die Oberfläche konfigurierbare Ersatz für einen Stapel handgeschriebener `unavailable`-Template-Sensoren.
 
 ## Funktionen
 
 - Ein `problem`-Binärsensor pro überwachter Domain (`light`, `switch`, `sensor`, `binary_sensor`, …), der die betroffenen Entities in seinen Attributen auflistet, dazu ein Gesamt-Problemsensor
-- Zähler für **nicht verfügbare Entities** und **nicht verfügbare Geräte** — ein ausgefallenes Gerät mit einem Dutzend Entities zählt beim Gerätesensor einmal, die Gerätenamen stehen in den Attributen
+- Zähler für **nicht verfügbare Entities** und **nicht verfügbare Geräte** — ein ausgefallenes Gerät mit einem Dutzend Entities zählt beim Gerätesensor einmal, die Gerätenamen stehen in den Attributen, ebenso welche davon komplett ausgefallen sind
 - Optionaler **Zählsensor pro Domain** (standardmäßig deaktiviert), der die Anzahl nicht verfügbarer Entities direkt als Zustand zeigt
 - Überwachte Domains in der Oberfläche auswählen — die Auswahl bietet jede Domain an, die es in deiner Instanz gibt
 - Ausnahmen per **Label**, **Entity**, **Gerät**, **Bereich**, **Integration** und **Regex-Muster** auf die Entity-ID
@@ -20,7 +20,8 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 - Stufe 1 wird bei Push-Integrationen (MQTT, ZHA, ESPHome …) automatisch übersprungen — erneutes Abfragen kann dort nichts bewirken
 - **Events** für jede Wiederherstellungsaktion, ihr Ergebnis und jede danach zurückgekehrte Entity – für Recovery-Statistiken mit Automationen und Recorder ([Events](#events))
 - Startkarenz: Nach einem Neustart von Home Assistant bleibt die Integration eine einstellbare Zeit still, weil Entities einige Minuten brauchen, bis sie da sind
-- Drei Meldewege, jeder einzeln abschaltbar: **persistente Benachrichtigungen** (pro Domain oder pro Gerät, aktualisiert sich selbst, verschwindet automatisch, Entities pro Gerät gruppiert), **Reparatur-Hinweise** (pro Domain ignorierbar) und ein optionaler **Notify-Dienst** für Push aufs Handy
+- Drei Meldewege, jeder einzeln abschaltbar: **persistente Benachrichtigungen** (aktualisieren sich selbst, verschwinden automatisch), **Reparatur-Hinweise** (pro Domain ignorierbar) und ein optionaler **Notify-Dienst** für Push aufs Handy
+- Melden **pro Domain** oder **pro Gerät**: Pro Gerät ist ein totes Gerät eine Zeile über alle seine Domains, gemeldet werden nur komplett ausgefallene Geräte, und ein Stromausfall schickt einen Push statt einem pro Gerät ([Benachrichtigungen](#benachrichtigungen))
 - Buttons **Jetzt prüfen** / **Wiederherstellen** für alles, worauf du nicht warten willst
 - Eingebaute **Dashboard-Karte** mit Zeilen pro Domain, Ausfall-Details pro Entity und einer Ein-Klick-Aktion „diese Entity ignorieren" — wird automatisch registriert, nichts separat zu installieren
 - Schonend für die CPU: ein Scan im Arbeitsspeicher pro Intervall (Standard 60 s), kein Template-Rendering und keine State-Change-Listener. Lange Entity-Listen bleiben aus dem Recorder heraus
@@ -127,6 +128,49 @@ In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard
 | Benachrichtigungen | Notify-Dienst | – | Optional, z. B. `notify.mobile_app_handy`. Wird nur gerufen, wenn etwas ausfällt oder zurückkommt, nie bei jedem Prüflauf. Pro Gerät landet alles, was sich in einem Prüflauf geändert hat, in einer Nachricht — ein Stromausfall mit fünf toten Geräten schickt einen Push |
 
 Es wird nur eine Instanz unterstützt — sie überwacht die gesamte Home-Assistant-Instanz.
+
+## Benachrichtigungen
+
+*Melden pro* (Konfigurieren → Benachrichtigungen) legt fest, was die persistente Benachrichtigung und der Notify-Dienst melden. Beispiel: ein toter Shelly mit Entities in `light` und `switch`, eine Flurlampe, die am Schalter aus ist, eine Steckdose, deren Relais weg ist, während ihre LED noch läuft, und ein Template-Licht ohne Gerät.
+
+**Pro Domain** (Standard): eine Benachrichtigung pro Domain, jede nicht verfügbare Entity, Entities desselben Geräts zu einer Zeile zusammengefasst.
+
+```
+Entity Watchguard – light (4)
+Nicht verfügbare Entities in `light`:
+• Flurlampe (light.flur) – seit 20.11.2026 08:10
+• Shelly Küche: 2 Entities (light.relay1, light.relay2) – seit 20.11.2026 08:15
+• Template-Licht (light.template) – seit 20.11.2026 08:12
+
+Entity Watchguard – switch (2)
+Nicht verfügbare Entities in `switch`:
+• Steckdose Dachboden (switch.dachboden) – seit 20.11.2026 08:20
+• Shelly Küche Relais 3 (switch.relay3) – seit 20.11.2026 08:15
+```
+
+**Pro Gerät**: eine Benachrichtigung für alle Domains, eine Zeile pro Gerät. Gemeldet werden nur Geräte, deren überwachte Entities *alle* nicht verfügbar sind; die Steckdose (LED läuft noch) fehlt also. Entities ohne Gerät stehen in einem eigenen Abschnitt.
+
+```
+Entity Watchguard – Geräte (2 Geräte, 1 ohne Gerät)
+Nicht verfügbare Geräte:
+• Flurlampe: 1 Entity (light.flur) – seit 20.11.2026 08:10
+• Shelly Küche: 3 Entities (light.relay1, light.relay2, switch.relay3) – seit 20.11.2026 08:15
+
+Nicht verfügbar, ohne Gerät:
+• Template-Licht (light.template) – seit 20.11.2026 08:12
+```
+
+**Beides**: beide Arten nebeneinander.
+
+Der **Notify-Dienst** folgt derselben Einstellung und wird nur bei Änderungen gerufen. Pro Domain schickt er eine Nachricht, wenn eine Domain ein Problem bekommt, und `light: alle Entities wieder verfügbar`, wenn sie wieder sauber ist. Pro Gerät schickt er pro Prüflauf eine Nachricht mit allem, was ausgefallen ist (Text wie oben), und eine mit allem, was zurück ist:
+
+```
+Wieder verfügbar: Shelly Küche, Template-Licht
+```
+
+**Reparatur-Hinweise** bleiben immer pro Domain, weil man sie dort pro Domain ignorieren kann.
+
+Was nehmen: *pro Domain*, wenn du von jeder einzelnen Entity wissen willst; *pro Gerät*, wenn dich vor allem tote Hardware interessiert und du weniger, ruhigere Meldungen willst. Teilweise ausgefallene Geräte siehst du unabhängig davon immer an den Domain-Sensoren, am Gerätesensor und auf der Dashboard-Karte.
 
 ## Entities
 
