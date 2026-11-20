@@ -213,15 +213,18 @@ def _async_remove_stale_entities(
 
     Otherwise dropping e.g. `camera` from the selection leaves
     binary_sensor.entity_watchguard_camera behind as a permanently
-    unavailable leftover.
+    unavailable leftover. Every entity the platforms create must be listed
+    here — anything missing gets its registry entry removed on each setup.
     """
     expected = {
         f"{entry.entry_id}_problem",
         f"{entry.entry_id}_total_unavailable",
+        f"{entry.entry_id}_unavailable_devices",
         f"{entry.entry_id}_last_recovery",
         f"{entry.entry_id}_check_now",
         f"{entry.entry_id}_recover_now",
         *(f"{entry.entry_id}_{domain}_problem" for domain in coordinator.monitored_domains),
+        *(f"{entry.entry_id}_{domain}_unavailable" for domain in coordinator.monitored_domains),
     }
     registry = er.async_get(hass)
     for registry_entry in er.async_entries_for_config_entry(registry, entry.entry_id):

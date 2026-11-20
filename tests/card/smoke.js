@@ -131,6 +131,13 @@ const renamedHass = {
       // The aggregate sensor has no `domain` and must not show up as a row.
       attributes: { status: "ok", count: 0, details: [] },
     },
+    // Per-domain count sensor (1.4.0): same `domain` attribute, but it is a
+    // plain sensor and must not become a second row for the domain.
+    "sensor.switch_count": {
+      entity_id: "sensor.switch_count",
+      state: "2",
+      attributes: { domain: "switch", warming_up: false, unit_of_measurement: "entities" },
+    },
     "button.look_again": { entity_id: "button.look_again", state: "unknown", attributes: {} },
     "button.fix_it": { entity_id: "button.fix_it", state: "unknown", attributes: {} },
     "binary_sensor.other_integration": {
@@ -142,6 +149,7 @@ const renamedHass = {
   entities: {
     "binary_sensor.my_switches": { entity_id: "binary_sensor.my_switches", platform: "entity_watchguard" },
     "binary_sensor.house_overall": { entity_id: "binary_sensor.house_overall", platform: "entity_watchguard", translation_key: "problem" },
+    "sensor.switch_count": { entity_id: "sensor.switch_count", platform: "entity_watchguard" },
     "button.look_again": { entity_id: "button.look_again", platform: "entity_watchguard", translation_key: "check_now" },
     "button.fix_it": { entity_id: "button.fix_it", platform: "entity_watchguard", translation_key: "recover_now" },
     "binary_sensor.other_integration": { entity_id: "binary_sensor.other_integration", platform: "some_other_integration" },
@@ -157,6 +165,7 @@ const renamedHtml = renamed.shadowRoot._card.innerHTML;
 
 const rows = renamed._sensors();
 checks.push(["renamed ids still resolve to one domain row", rows.length === 1 && rows[0].domain === "switch"]);
+checks.push(["per-domain count sensor is not listed as a row", !rows.some((r) => r.entityId === "sensor.switch_count")]);
 checks.push(["aggregate sensor is not listed as a row", !rows.some((r) => r.entityId === "binary_sensor.house_overall")]);
 checks.push(["another integration's sensor is ignored", !rows.some((r) => r.entityId === "binary_sensor.other_integration")]);
 checks.push(["renamed check button found by translation_key", renamed._button("check_now") === "button.look_again"]);

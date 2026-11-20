@@ -12,7 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, MAX_LISTED
 from .coordinator import DomainReport, WatchguardCoordinator
-from .entity import WatchguardEntity
+from .entity import WatchguardEntity, pretty_domain
 
 STATUS_WARMING_UP = "warming_up"
 STATUS_OK = "ok"
@@ -39,10 +39,6 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-def _pretty(domain: str) -> str:
-    return domain.replace("_", " ").title()
-
-
 class WatchguardDomainProblem(WatchguardEntity, BinarySensorEntity):
     """ON when the domain has unavailable entities past the grace period."""
 
@@ -58,7 +54,7 @@ class WatchguardDomainProblem(WatchguardEntity, BinarySensorEntity):
         super().__init__(coordinator, entry)
         self._domain = domain
         self._attr_unique_id = f"{entry.entry_id}_{domain}_problem"
-        self._attr_name = _pretty(domain)
+        self._attr_name = pretty_domain(domain)
 
     @property
     def _report(self) -> DomainReport | None:

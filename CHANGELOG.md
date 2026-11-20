@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-11-20
+### Added
+- **Count sensor per watched domain** (#7): `sensor.entity_watchguard_<domain>_unavailable` shows the number of unavailable entities in that domain directly as its state, where the per-domain problem binary sensor only says OK/Problem. Unit `entities`, state class `measurement` for long-term statistics. Attributes: `domain`, `warming_up`. Stays at `0` during the startup grace period
+- The count sensors are **disabled by default**, so watching many domains doesn't add a pile of entities nobody looks at. Enable the ones you want under Settings → Devices & services → Entity Watchguard → Entities
+
+### Fixed
+- The unavailable devices sensor (new in 1.3.0) was missing from the list of the integration's own entities that the stale-entity cleanup keeps. On every restart and options change its registry entry was removed and immediately re-created, with a misleading "its domain is no longer watched" line in the log. Home Assistant restores the settings of a re-created entity (name, entity ID, area, icon), so nothing visible was lost
+
+### Notes
+- Backward compatible: the problem binary sensors, their attributes and the dashboard card are unchanged. The card keeps reading its counts from the binary sensors and ignores the new sensors
+
 ## [1.3.0] - 2026-11-19
 ### Added
 - **New sensor `sensor.entity_watchguard_unavailable_devices`** (#5): counts the devices that have at least one unavailable entity past the grace period. A dead Shelly with twelve entities counts once, so the number says how much hardware is actually affected. Unit `devices`, state class `measurement` for long-term statistics. Attributes:

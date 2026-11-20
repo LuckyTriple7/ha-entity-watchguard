@@ -13,6 +13,7 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 
 - Ein `problem`-Binärsensor pro überwachter Domain (`light`, `switch`, `sensor`, `binary_sensor`, …), der die betroffenen Entities in seinen Attributen auflistet, dazu ein Gesamt-Problemsensor
 - Zähler für **nicht verfügbare Entities** und **nicht verfügbare Geräte** — ein ausgefallenes Gerät mit einem Dutzend Entities zählt beim Gerätesensor einmal, die Gerätenamen stehen in den Attributen
+- Optionaler **Zählsensor pro Domain** (standardmäßig deaktiviert), der die Anzahl nicht verfügbarer Entities direkt als Zustand zeigt
 - Überwachte Domains in der Oberfläche auswählen — die Auswahl bietet jede Domain an, die es in deiner Instanz gibt
 - Ausnahmen per **Label**, **Entity**, **Gerät**, **Bereich**, **Integration** und **Regex-Muster** auf die Entity-ID
 - Eskalierende Wiederherstellung: Stufe 1 fragt die Entity erneut ab (`homeassistant.update_entity`), Stufe 2 lädt den Config-Entry der zugehörigen Integration neu. Stufe 2 wiederholt sich in großem Abstand und gibt nach einer einstellbaren Zahl von Versuchen auf
@@ -131,6 +132,7 @@ Es wird nur eine Instanz unterstützt — sie überwacht die gesamte Home-Assist
 | Entity | Typ | Beschreibung |
 |---|---|---|
 | `binary_sensor.entity_watchguard_<domain>` | problem | AN, wenn die Domain nicht verfügbare Entities hat. Attribute: `count`, `unavailable_entities`, `unavailable_names`, `unavailable_since`, `recovery_attempts`, `given_up_entities`, `details` (Zeilen pro Entity: `entity_id`, `name`, `since`, `attempts`, `given_up`), `status`, `truncated` |
+| `sensor.entity_watchguard_<domain>_unavailable` | Anzahl | Anzahl nicht verfügbarer Entities in dieser Domain als Zustand — für Kacheln, Verlaufsdiagramme und Langzeitstatistik (Einheit `entities`, State-Class `measurement`). **Standardmäßig deaktiviert**, pro Domain aktivierbar unter Einstellungen → Geräte & Dienste → Entity Watchguard → Entities. Attribute: `domain`, `warming_up` |
 | `binary_sensor.entity_watchguard_problem` | problem | AN, wenn irgendeine überwachte Domain ein Problem hat. Attribute: `affected_domains`, `unavailable_entities` |
 | `sensor.entity_watchguard_unavailable_entities` | Anzahl | Summe über alle überwachten Domains, Aufschlüsselung `per_domain` in den Attributen |
 | `sensor.entity_watchguard_unavailable_devices` | Anzahl | Geräte mit mindestens einer nicht verfügbaren Entity — ein ausgefallenes Gerät mit zwölf Entities zählt einmal. Attribute: `unavailable_devices` (Gerätenamen, einer pro Gerät), `fully_unavailable` (Geräte, bei denen jede überwachte Entity weg ist), `entities_without_device` (nicht verfügbare Entities ohne Gerät, z. B. Templates), `details` (Zeilen pro Gerät: `device_id`, `name`, `count`, `entity_ids`, `since`, `given_up`, `fully_unavailable`), `truncated`, `warming_up` |
@@ -138,7 +140,7 @@ Es wird nur eine Instanz unterstützt — sie überwacht die gesamte Home-Assist
 | `button.entity_watchguard_check_now` | Button | Sofort scannen, statt auf das Prüfintervall zu warten — beendet außerdem die Startkarenz vorzeitig |
 | `button.entity_watchguard_recover_now` | Button | Stufe 1 für alles gerade Nichtverfügbare, ohne die Wartezeiten |
 
-Während der Startkarenz bleibt jeder Sensor `off` und meldet `status: warming_up`.
+Während der Startkarenz bleibt jeder Problemsensor `off` und meldet `status: warming_up`; die Zählsensoren bleiben bei `0`.
 
 Die Entity- und Geräte-Listen sind bei 50 Einträgen gekappt (`truncated: true` zeigt, dass es mehr waren; `count` und die Sensorwerte bleiben immer exakt) und aus dem Recorder ausgenommen — ein großer Ausfall schreibt so nicht bei jedem Scan dieselbe lange Liste in die Datenbank.
 
