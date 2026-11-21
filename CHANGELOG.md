@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-11-21
+### Added
+- **Select all existing domains** (#15): new checkbox in the domain step of the setup and under Configure → Monitored domains. It ticks every domain that has entities in your instance and shows the form again, so you can untick single domains before saving. Helpers, automations, scripts, scenes, zones, `update`, `event` and similar domains are left out; they can still be ticked by hand
+
+### Changed
+- The domain picker is now a checkbox list instead of a dropdown, so several domains can be picked with one click each
+
+### Notes
+- The selection is a fixed list: domains that appear later are not added automatically. Tick the checkbox again to pick them up
+- Each watched domain adds a problem binary sensor (and a count sensor, disabled by default)
+- Backward compatible: existing selections are kept
+
 ## [1.6.0] - 2026-11-20
 ### Added
 - **Exclude by entity category** (#11): new option *Excluded entity categories* under Configure → Exceptions, with **Configuration** and **Diagnostic**. Excluded entities are never reported and never recovered, like every other exception. Diagnostic entities (signal strength, firmware update, last seen, uptime) often drop out while the device itself works fine

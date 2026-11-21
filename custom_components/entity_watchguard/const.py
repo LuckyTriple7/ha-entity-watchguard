@@ -71,6 +71,40 @@ SUGGESTED_DOMAINS = sorted(
     }
 )
 
+# Form-only checkbox in the domain steps; never stored in the entry.
+CONF_SELECT_ALL_DOMAINS = "select_all_domains"
+
+# Left out by "select all existing domains": helpers, automations and other
+# entities that don't belong to a device and don't go unavailable on their
+# own, or that duplicate their members (group). Still selectable by hand.
+SELECT_ALL_SKIPPED_DOMAINS = frozenset(
+    {
+        "automation",
+        "conversation",
+        "counter",
+        "event",
+        "group",
+        "input_boolean",
+        "input_button",
+        "input_datetime",
+        "input_number",
+        "input_select",
+        "input_text",
+        "person",
+        "scene",
+        "schedule",
+        "script",
+        "stt",
+        "sun",
+        "tag",
+        "timer",
+        "tts",
+        "update",
+        "wake_word",
+        "zone",
+    }
+)
+
 DEFAULT_STARTUP_DELAY = 300
 DEFAULT_CHECK_INTERVAL = 60
 DEFAULT_GRACE_PERIOD = 120

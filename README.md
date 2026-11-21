@@ -14,7 +14,7 @@ Home Assistant custom integration that watches your entities for the `unavailabl
 - One `problem` binary sensor per watched domain (`light`, `switch`, `sensor`, `binary_sensor`, …), listing the affected entities in its attributes, plus one overall problem sensor
 - Counters for **unavailable entities** and **unavailable devices** — a dead device with a dozen entities counts once on the device sensor, which lists the device names and which of them are completely down
 - Optional **count sensor per domain** (disabled by default) that shows the number of unavailable entities directly as its state
-- Pick the watched domains in the UI — the picker offers every domain that exists in your instance
+- Pick the watched domains in the UI as a checkbox list — it offers every domain that exists in your instance, and *Select all existing domains* ticks them all in one go
 - Exceptions by **label**, **entity**, **device**, **area**, **integration**, **entity category** (e.g. diagnostic) and **regex pattern** on the entity ID
 - Escalating recovery: stage 1 re-polls the entity (`homeassistant.update_entity`), stage 2 reloads the config entry the entity belongs to. Stage 2 repeats on a slow interval and gives up after a configurable number of attempts
 - Stage 1 is skipped automatically for push integrations (MQTT, ZHA, ESPHome …), where re-polling cannot achieve anything
@@ -103,7 +103,7 @@ For 1.0.x the card was a separate HACS dashboard repository, *Entity Watchguard 
 
 ## Configuration
 
-**Settings → Devices & Services → Add Integration → Entity Watchguard**, then pick the domains to watch. Everything else uses defaults and can be changed later under **Configure**:
+**Settings → Devices & Services → Add Integration → Entity Watchguard**, then tick the domains to watch. *Select all existing domains* ticks every domain that has entities in your instance and opens the form again, so you can untick single ones before saving; helpers, automations, scripts, scenes, zones, `update`, `event` and similar domains are left out (you can still tick them by hand). Everything else uses defaults and can be changed later under **Configure**:
 
 | Step | Setting | Default | Notes |
 |---|---|---|---|

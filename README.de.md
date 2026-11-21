@@ -14,7 +14,7 @@ Home-Assistant-Integration, die Entities auf den Zustand `unavailable` überwach
 - Ein `problem`-Binärsensor pro überwachter Domain (`light`, `switch`, `sensor`, `binary_sensor`, …), der die betroffenen Entities in seinen Attributen auflistet, dazu ein Gesamt-Problemsensor
 - Zähler für **nicht verfügbare Entities** und **nicht verfügbare Geräte** — ein ausgefallenes Gerät mit einem Dutzend Entities zählt beim Gerätesensor einmal, die Gerätenamen stehen in den Attributen, ebenso welche davon komplett ausgefallen sind
 - Optionaler **Zählsensor pro Domain** (standardmäßig deaktiviert), der die Anzahl nicht verfügbarer Entities direkt als Zustand zeigt
-- Überwachte Domains in der Oberfläche auswählen — die Auswahl bietet jede Domain an, die es in deiner Instanz gibt
+- Überwachte Domains in der Oberfläche als Checkbox-Liste auswählen — die Liste bietet jede Domain an, die es in deiner Instanz gibt, und *Alle vorhandenen Domains auswählen* hakt alle auf einmal an
 - Ausnahmen per **Label**, **Entity**, **Gerät**, **Bereich**, **Integration**, **Entity-Kategorie** (z. B. Diagnose) und **Regex-Muster** auf die Entity-ID
 - Eskalierende Wiederherstellung: Stufe 1 fragt die Entity erneut ab (`homeassistant.update_entity`), Stufe 2 lädt den Config-Entry der zugehörigen Integration neu. Stufe 2 wiederholt sich in großem Abstand und gibt nach einer einstellbaren Zahl von Versuchen auf
 - Stufe 1 wird bei Push-Integrationen (MQTT, ZHA, ESPHome …) automatisch übersprungen — erneutes Abfragen kann dort nichts bewirken
@@ -103,7 +103,7 @@ In 1.0.x war die Karte ein eigenes HACS-Dashboard-Repository, *Entity Watchguard
 
 ## Konfiguration
 
-**Einstellungen → Geräte & Dienste → Integration hinzufügen → Entity Watchguard**, dann die zu überwachenden Domains wählen. Alles Weitere nutzt Standardwerte und lässt sich später unter **Konfigurieren** ändern:
+**Einstellungen → Geräte & Dienste → Integration hinzufügen → Entity Watchguard**, dann die zu überwachenden Domains anhaken. *Alle vorhandenen Domains auswählen* hakt jede Domain an, für die es in deiner Instanz Entities gibt, und öffnet das Formular erneut, damit du einzelne vor dem Speichern wieder abwählen kannst; Helfer, Automationen, Skripte, Szenen, Zonen, `update`, `event` und ähnliche Domains bleiben außen vor (von Hand lassen sie sich weiter anhaken). Alles Weitere nutzt Standardwerte und lässt sich später unter **Konfigurieren** ändern:
 
 | Schritt | Einstellung | Standard | Hinweise |
 |---|---|---|---|

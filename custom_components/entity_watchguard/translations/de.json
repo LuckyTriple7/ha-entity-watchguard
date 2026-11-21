@@ -5,7 +5,11 @@
         "title": "Entity Watchguard",
         "description": "Wähle die Domains, die auf nicht verfügbare Entities überwacht werden sollen. Alles Weitere (Zeiten, Wiederherstellung, Ausnahmen, Benachrichtigungen) lässt sich später in den Optionen anpassen.",
         "data": {
-          "monitored_domains": "Überwachte Domains"
+          "monitored_domains": "Überwachte Domains",
+          "select_all_domains": "Alle vorhandenen Domains auswählen"
+        },
+        "data_description": {
+          "select_all_domains": "Hakt jede Domain an, für die es in dieser Instanz Entities gibt (ohne Helfer, Automationen, Skripte, Szenen, Zonen, Update und Ähnliches). Das Formular öffnet sich erneut, damit du einzelne Domains vor dem Speichern wieder abwählen kannst."
         }
       }
     },
@@ -31,7 +35,11 @@
       "domains": {
         "title": "Überwachte Domains",
         "data": {
-          "monitored_domains": "Überwachte Domains"
+          "monitored_domains": "Überwachte Domains",
+          "select_all_domains": "Alle vorhandenen Domains auswählen"
+        },
+        "data_description": {
+          "select_all_domains": "Hakt jede Domain an, für die es in dieser Instanz Entities gibt (ohne Helfer, Automationen, Skripte, Szenen, Zonen, Update und Ähnliches). Das Formular öffnet sich erneut, damit du einzelne Domains vor dem Speichern wieder abwählen kannst."
         }
       },
       "timing": {
