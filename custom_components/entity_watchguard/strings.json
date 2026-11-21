@@ -5,7 +5,11 @@
         "title": "Entity Watchguard",
         "description": "Choose the domains to watch for unavailable entities. Everything else (timings, recovery, exceptions, notifications) can be adjusted later via the options.",
         "data": {
-          "monitored_domains": "Monitored domains"
+          "monitored_domains": "Monitored domains",
+          "select_all_domains": "Select all existing domains"
+        },
+        "data_description": {
+          "select_all_domains": "Ticks every domain that has entities in this instance (without helpers, automations, scripts, scenes, zones, update and similar). The form opens again so you can untick single domains before saving."
         }
       }
     },
@@ -31,7 +35,11 @@
       "domains": {
         "title": "Monitored domains",
         "data": {
-          "monitored_domains": "Monitored domains"
+          "monitored_domains": "Monitored domains",
+          "select_all_domains": "Select all existing domains"
+        },
+        "data_description": {
+          "select_all_domains": "Ticks every domain that has entities in this instance (without helpers, automations, scripts, scenes, zones, update and similar). The form opens again so you can untick single domains before saving."
         }
       },
       "timing": {

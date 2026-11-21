@@ -47,6 +47,7 @@ from .const import (
     CONF_RELOAD_COOLDOWN,
     CONF_REPAIRS_ENABLED,
     CONF_RETRY_INTERVAL,
+    CONF_SELECT_ALL_DOMAINS,
     CONF_STAGE1_DELAY,
     CONF_STAGE1_ENABLED,
     CONF_STAGE2_DELAY,
@@ -57,6 +58,7 @@ from .const import (
     DOMAIN,
     ENTITY_CATEGORIES,
     NOTIFY_GROUPINGS,
+    SELECT_ALL_SKIPPED_DOMAINS,
     SUGGESTED_DOMAINS,
     effective_options,
 )
@@ -71,13 +73,39 @@ def _seconds(min_: int, max_: int) -> NumberSelector:
 
 
 @callback
-def _domain_selector(hass: HomeAssistant, selected: list[str]) -> SelectSelector:
-    """Domains that actually exist in this instance, plus the usual suspects."""
-    available = {state.entity_id.split(".")[0] for state in hass.states.async_all()}
-    options = sorted(available | set(SUGGESTED_DOMAINS) | set(selected))
-    return SelectSelector(
-        SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN)
+def _existing_domains(hass: HomeAssistant) -> set[str]:
+    return {state.domain for state in hass.states.async_all()}
+
+
+@callback
+def _domains_schema(hass: HomeAssistant, selected: list[str]) -> vol.Schema:
+    """Domains that exist in this instance plus the usual suspects, as checkboxes."""
+    options = sorted(_existing_domains(hass) | set(SUGGESTED_DOMAINS) | set(selected))
+    return vol.Schema(
+        {
+            vol.Required(CONF_MONITORED_DOMAINS, default=selected): SelectSelector(
+                SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.LIST)
+            ),
+            vol.Optional(CONF_SELECT_ALL_DOMAINS, default=False): BooleanSelector(),
+        }
     )
+
+
+@callback
+def _apply_select_all(hass: HomeAssistant, user_input: dict) -> bool:
+    """Handle the "select all existing domains" checkbox.
+
+    Adds every domain that has entities here (minus helpers and the like) to
+    the selection and returns True, so the form is shown again with all of
+    them ticked and the user can untick single ones before saving.
+    """
+    if not user_input.pop(CONF_SELECT_ALL_DOMAINS, False):
+        return False
+    user_input[CONF_MONITORED_DOMAINS] = sorted(
+        set(user_input.get(CONF_MONITORED_DOMAINS) or [])
+        | (_existing_domains(hass) - SELECT_ALL_SKIPPED_DOMAINS)
+    )
+    return True
 
 
 @callback
@@ -117,21 +145,17 @@ class EntityWatchguardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None) -> FlowResult:
         errors: dict[str, str] = {}
 
-        if user_input is not None:
+        # The "select all" checkbox only fills the list and shows the form again.
+        if user_input is not None and not _apply_select_all(self.hass, user_input):
             if not user_input[CONF_MONITORED_DOMAINS]:
                 errors[CONF_MONITORED_DOMAINS] = "no_domains"
             else:
                 return self.async_create_entry(title="Entity Watchguard", data=user_input)
 
         selected = (user_input or {}).get(CONF_MONITORED_DOMAINS, DEFAULT_MONITORED_DOMAINS)
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_MONITORED_DOMAINS, default=selected
-                ): _domain_selector(self.hass, selected)
-            }
+        return self.async_show_form(
+            step_id="user", data_schema=_domains_schema(self.hass, selected), errors=errors
         )
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     @staticmethod
     @callback
@@ -158,21 +182,21 @@ class EntityWatchguardOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_domains(self, user_input=None) -> FlowResult:
         errors: dict[str, str] = {}
-        if user_input is not None:
+        # The "select all" checkbox only fills the list and shows the form again.
+        if user_input is not None and not _apply_select_all(self.hass, user_input):
             if not user_input[CONF_MONITORED_DOMAINS]:
                 errors[CONF_MONITORED_DOMAINS] = "no_domains"
             else:
                 return self._save(user_input)
 
-        selected = list(self._current[CONF_MONITORED_DOMAINS])
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_MONITORED_DOMAINS, default=selected
-                ): _domain_selector(self.hass, selected)
-            }
+        selected = (
+            user_input[CONF_MONITORED_DOMAINS]
+            if user_input is not None
+            else list(self._current[CONF_MONITORED_DOMAINS])
         )
-        return self.async_show_form(step_id="domains", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="domains", data_schema=_domains_schema(self.hass, selected), errors=errors
+        )
 
     async def async_step_timing(self, user_input=None) -> FlowResult:
         if user_input is not None:
